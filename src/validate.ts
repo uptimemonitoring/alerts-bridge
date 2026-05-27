@@ -59,8 +59,10 @@ function requireString(obj: Record<string, unknown>, key: string): string | null
 function requireSafeInt(obj: Record<string, unknown>, key: string, allowZero = false): number | null {
   const v = obj[key];
   if (!Number.isSafeInteger(v)) return null;
-  if (!allowZero && (v as number) <= 0) return null;
-  return v as number;
+  const n = v as number;
+  if (n < 0) return null;
+  if (!allowZero && n === 0) return null;
+  return n;
 }
 
 function requireFiniteNumber(obj: Record<string, unknown>, key: string): number | null {

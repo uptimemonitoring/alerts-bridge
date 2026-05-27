@@ -200,6 +200,28 @@ describe("validate — security payload validation", () => {
   });
 });
 
+describe("validate — negative monitor_id rejection (codex fix)", () => {
+  it("rejects account_suspended with monitor_id=-1 with 400", () => {
+    const body = '{"event":"account_suspended","account_id":42,"monitor_id":-1,"reason":"fraud","detail":"d","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects cap_hit with monitor_id=-1 with 400", () => {
+    const body = '{"event":"cap_hit","account_id":42,"monitor_id":-1,"monitors_current":100,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("accepts account_suspended with monitor_id=0 (allowZero=true)", () => {
+    const body = '{"event":"account_suspended","account_id":42,"monitor_id":0,"reason":"fraud","detail":"d","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("validate — fleet state mismatch (codex fix)", () => {
   it("rejects fleet_util_exceeded with missing state with 400", () => {
     const body = '{"event":"fleet_util_exceeded","util":0.95,"window_hours":24,"detected_at":"2026-01-01T00:00:00Z"}';
