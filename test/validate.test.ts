@@ -199,3 +199,88 @@ describe("validate — security payload validation", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("validate — fleet state mismatch (codex fix)", () => {
+  it("rejects fleet_util_exceeded with missing state with 400", () => {
+    const body = '{"event":"fleet_util_exceeded","util":0.95,"window_hours":24,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/state=breached/);
+    }
+  });
+
+  it("rejects fleet_util_exceeded with state=ok with 400", () => {
+    const body = '{"event":"fleet_util_exceeded","state":"ok","util":0.95,"window_hours":24,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/state=breached/);
+    }
+  });
+
+  it("rejects fleet_util_recovered with missing state with 400", () => {
+    const body = '{"event":"fleet_util_recovered","util":0.3,"window_hours":24,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/state=ok/);
+    }
+  });
+
+  it("rejects fleet_util_recovered with state=breached with 400", () => {
+    const body = '{"event":"fleet_util_recovered","state":"breached","util":0.3,"window_hours":24,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/state=ok/);
+    }
+  });
+});
+
+describe("validate — RFC3339 strict date validation (codex fix)", () => {
+  it("rejects 2026-02-29T00:00:00Z (non-leap year) with 400", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects 2025-02-29T00:00:00Z (non-leap year) with 400", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2025-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects T24:00:00Z (hour overflow) with 400", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T24:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects T23:60:00Z (minute overflow) with 400", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T23:60:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects +99:99 offset with 400", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T00:00:00+99:99","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("accepts 2024-02-29T00:00:00Z (leap year) with 200", () => {
+    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2024-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+});

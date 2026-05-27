@@ -11,8 +11,40 @@ const RFC3339_RE =
 function validTimestamp(s: unknown): s is string {
   if (typeof s !== "string") return false;
   if (!RFC3339_RE.test(s)) return false;
-  const d = new Date(s);
-  return !isNaN(d.getTime());
+
+  // Parse components from fixed character positions (regex guarantees digit layout)
+  const year   = parseInt(s.slice(0, 4), 10);
+  const month  = parseInt(s.slice(5, 7), 10);
+  const day    = parseInt(s.slice(8, 10), 10);
+  const hour   = parseInt(s.slice(11, 13), 10);
+  const minute = parseInt(s.slice(14, 16), 10);
+  const second = parseInt(s.slice(17, 19), 10);
+
+  // Reject out-of-range time components (catches T24:00:00Z, T23:60:00Z, etc.)
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (hour > 23) return false;
+  if (minute > 59) return false;
+  if (second > 59) return false;
+
+  // Reject out-of-range UTC offset (catches +99:99)
+  if (s[s.length - 1] !== "Z") {
+    const offH = parseInt(s.slice(-5, -3), 10);
+    const offM = parseInt(s.slice(-2), 10);
+    if (offH > 23 || offM > 59) return false;
+  }
+
+  // Round-trip: if any component overflows (e.g. Feb 29 in a non-leap year
+  // normalizes to Mar 1), Date.UTC reflects that and the comparison fails
+  const d = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() + 1 === month &&
+    d.getUTCDate() === day &&
+    d.getUTCHours() === hour &&
+    d.getUTCMinutes() === minute &&
+    d.getUTCSeconds() === second
+  );
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -162,6 +194,9 @@ function validateSecurityPayload(
       };
     }
     case "fleet_util_exceeded": {
+      if (body["state"] !== "breached") {
+        return { ok: false, status: 400, message: "fleet_util_exceeded requires state=breached" };
+      }
       const util = requireFiniteNumber(body, "util");
       if (util === null) return { ok: false, status: 400, message: "util must be a finite number" };
       const window_hours = requireSafeInt(body, "window_hours");
@@ -181,6 +216,9 @@ function validateSecurityPayload(
       };
     }
     case "fleet_util_recovered": {
+      if (body["state"] !== "ok") {
+        return { ok: false, status: 400, message: "fleet_util_recovered requires state=ok" };
+      }
       const util = requireFiniteNumber(body, "util");
       if (util === null) return { ok: false, status: 400, message: "util must be a finite number" };
       const window_hours = requireSafeInt(body, "window_hours");
