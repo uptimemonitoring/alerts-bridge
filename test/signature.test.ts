@@ -4,11 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { verifySignature } from "../src/auth.js";
 
-// Mirrors the Go upstream signing contract (um-api/internal/webhook/sign.go):
-// the HMAC is computed over the raw byte body as received over the wire — no
-// JSON re-parsing or re-serialization. This is the source-of-truth reference.
-// (The webhooks.md JS example that re-serializes is wrong; it will be fixed in
-//  a follow-up PR on monitive/uptimemonitoring-web.)
+// Mirrors the Monitive signing contract: the HMAC is computed over the raw
+// byte body as received over the wire — no JSON re-parsing or re-serialization.
+// This is the source-of-truth reference.
 function referenceSign(secret: string, raw: Buffer): string {
   return createHmac("sha256", secret)
     .update(raw)
