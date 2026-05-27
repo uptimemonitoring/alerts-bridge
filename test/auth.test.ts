@@ -2,9 +2,10 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { verifySignature } from "../src/auth.js";
 
-function sign(secret: string, raw: string): string {
+function sign(secret: string, raw: Uint8Array | Buffer | string): string {
+  const bytes = typeof raw === "string" ? Buffer.from(raw, "utf8") : raw;
   return createHmac("sha256", secret)
-    .update(JSON.stringify(JSON.parse(raw)))
+    .update(bytes)
     .digest("hex");
 }
 
@@ -14,8 +15,8 @@ function utf8(s: string): Uint8Array {
 
 const PAYLOAD = '{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T00:00:00Z","evidence":{"primary_error":"err","status_code":503,"region":"US-E"}}';
 const SECRET = "testsecret";
-const SIG = sign(SECRET, PAYLOAD);
 const RAW = utf8(PAYLOAD);
+const SIG = sign(SECRET, RAW);
 
 describe("verifySignature", () => {
   it("accepts a valid signature with a single secret", async () => {
@@ -57,15 +58,17 @@ describe("verifySignature", () => {
   it("accepts a security alert payload with the security secret", async () => {
     const secPayload = '{"event":"kill_switch_flipped","active":true,"sentinel_path":"/x","detected_at":"2026-01-01T00:00:00Z"}';
     const secSecret = "security-secret";
-    const secSig = sign(secSecret, secPayload);
-    expect(await verifySignature(utf8(secPayload), secSig, [secSecret])).toBe(true);
+    const secRaw = utf8(secPayload);
+    const secSig = sign(secSecret, secRaw);
+    expect(await verifySignature(secRaw, secSig, [secSecret])).toBe(true);
   });
 
   it("rejects a security payload verified against a monitor-only secret", async () => {
     const secPayload = '{"event":"kill_switch_flipped","active":true,"sentinel_path":"/x","detected_at":"2026-01-01T00:00:00Z"}';
     const monitorSecret = "monitor-secret";
-    const secSig = sign("security-secret", secPayload);
-    expect(await verifySignature(utf8(secPayload), secSig, [monitorSecret])).toBe(false);
+    const secRaw = utf8(secPayload);
+    const secSig = sign("security-secret", secRaw);
+    expect(await verifySignature(secRaw, secSig, [monitorSecret])).toBe(false);
   });
 
   it("rejects a signature that is too short", async () => {

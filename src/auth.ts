@@ -38,15 +38,16 @@ export async function verifySignature(
   // Reject non-hex or wrong-length before constant-time comparison.
   if (!HEX_RE.test(signatureHeader)) return false;
 
-  let normalized: Uint8Array<ArrayBuffer>;
-  try {
-    normalized = utf8(JSON.stringify(JSON.parse(new TextDecoder().decode(rawBody))));
-  } catch {
-    return false;
-  }
+  // Sign the raw bytes directly — same as the Go upstream (um-api/internal/webhook/sign.go).
+  // Re-serializing through JSON.parse/stringify is wrong: any whitespace or escape
+  // divergence between Go's json.Marshal and JS's JSON.stringify produces a different
+  // byte sequence and causes 401s on legitimate deliveries.
+  const bodyBuffer = rawBody.buffer instanceof ArrayBuffer
+    ? (rawBody as Uint8Array<ArrayBuffer>)
+    : (new Uint8Array(rawBody) as Uint8Array<ArrayBuffer>);
 
   for (const secret of secrets) {
-    const expected = await hmacHex(secret, normalized);
+    const expected = await hmacHex(secret, bodyBuffer);
     if (constantTimeEqualHex(expected, signatureHeader.toLowerCase())) {
       return true;
     }

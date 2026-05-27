@@ -9,9 +9,8 @@ const FIXTURES_DIR = join(new URL(".", import.meta.url).pathname, "fixtures");
 const MONITOR_SECRET = "monitor-secret";
 const SECURITY_SECRET = "security-secret";
 
-function sign(secret: string, raw: Buffer | string): string {
-  const s = typeof raw === "string" ? raw : raw.toString("utf8");
-  return createHmac("sha256", secret).update(JSON.stringify(JSON.parse(s))).digest("hex");
+function sign(secret: string, raw: Buffer | Uint8Array): string {
+  return createHmac("sha256", secret).update(raw).digest("hex");
 }
 
 function makeRequest(

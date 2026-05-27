@@ -4,12 +4,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { verifySignature } from "../src/auth.js";
 
-// Semantically equivalent to the webhooks.md example:
-// docs: JSON.stringify(req.body) (Express pre-parsed body)
-// bridge: JSON.stringify(JSON.parse(raw)) — produces the same bytes for ASCII JSON
+// Mirrors the Go upstream signing contract (um-api/internal/webhook/sign.go):
+// the HMAC is computed over the raw byte body as received over the wire — no
+// JSON re-parsing or re-serialization. This is the source-of-truth reference.
+// (The webhooks.md JS example that re-serializes is wrong; it will be fixed in
+//  a follow-up PR on monitive/uptimemonitoring-web.)
 function referenceSign(secret: string, raw: Buffer): string {
   return createHmac("sha256", secret)
-    .update(JSON.stringify(JSON.parse(raw.toString("utf8"))))
+    .update(raw)
     .digest("hex");
 }
 
@@ -26,10 +28,6 @@ describe("signature compatibility contract", () => {
   for (const fixture of fixtures) {
     it(`accepts reference-signed ${fixture}`, async () => {
       const rawBuf = readFileSync(join(FIXTURES_DIR, fixture));
-      // Assert round-trip stability — fixture must satisfy JSON.stringify(JSON.parse(raw)) === raw
-      const roundTripped = JSON.stringify(JSON.parse(rawBuf.toString("utf8")));
-      expect(roundTripped).toBe(rawBuf.toString("utf8"));
-
       const raw = new Uint8Array(rawBuf);
       const sig = referenceSign(SECRET, rawBuf);
       expect(await verifySignature(raw, sig, [SECRET])).toBe(true);
