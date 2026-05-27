@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { handle } from "../src/index.js";
+import { providers } from "../src/providers/index.js";
 import type { Env } from "../src/types.js";
 
 const FIXTURES_DIR = join(new URL(".", import.meta.url).pathname, "fixtures");
@@ -145,6 +146,7 @@ describe("handle — provider dispatch", () => {
     const res = await handle(req, baseEnv, raw);
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
+    expect(body["ok"]).toBe(true);
     expect(body["providersDispatched"]).toBe(0);
     expect(body["providersFailed"]).toBe(0);
     expect(body["results"]).toEqual([]);
@@ -159,10 +161,11 @@ describe("handle — provider dispatch", () => {
     const res = await handle(req, pushoverEnv, raw);
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
+    expect(body["ok"]).toBe(true);
     expect(body["providersDispatched"]).toBe(1);
     expect(body["providersFailed"]).toBe(0);
     const results = body["results"] as Array<Record<string, unknown>>;
-    expect(results[0]).toEqual({ provider: "pushover", status: 200 });
+    expect(results[0]).toEqual({ provider: "pushover", ok: true });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("api.pushover.net"),
       expect.any(Object),
@@ -177,26 +180,50 @@ describe("handle — provider dispatch", () => {
     const res = await handle(req, pushoverEnv, raw);
     expect(res.status).toBe(500);
     const body = await res.json() as Record<string, unknown>;
-    expect(body["providersFailed"]).toBe(1);
-    expect(body["providersDispatched"]).toBe(0);
+    expect(body["ok"]).toBe(false);
+    expect(body["failures"]).toEqual(["pushover"]);
+    expect(body["succeeded"]).toEqual([]);
     const results = body["results"] as Array<Record<string, unknown>>;
-    expect(String(results[0]?.["error"])).toContain("503");
+    expect(String(results[0]?.["reason"])).toContain("503");
   });
 
-  it("returns 200 with mixed results for pushover + unknown provider", async () => {
+  it("returns 500 when one of two providers fails (P1 partial failure)", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ status: 1 }), { status: 200 }));
     const { raw, buf } = loadFixture("monitor-down.json");
     const sig = sign(MONITOR_SECRET, buf);
     const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
-    const env: Env = { ...pushoverEnv, PROVIDER: "pushover,nonexistent" };
+    providers["fakefail"] = {
+      name: "fakefail",
+      async send() { return { ok: false, reason: "simulated failure" }; },
+    };
+    let res: Response;
+    try {
+      const env: Env = { ...pushoverEnv, PROVIDER: "pushover,fakefail" };
+      res = await handle(req, env, raw);
+    } finally {
+      delete providers["fakefail"];
+    }
+    expect(res!.status).toBe(500);
+    const body = await res!.json() as Record<string, unknown>;
+    expect(body["ok"]).toBe(false);
+    expect(body["failures"]).toEqual(["fakefail"]);
+    expect(body["succeeded"]).toEqual(["pushover"]);
+  });
+
+  it("rejects with ConfigError for unknown provider name (P2-2)", async () => {
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const env: Env = { ...baseEnv, PROVIDER: "nonexistent" };
+    await expect(handle(req, env, raw)).rejects.toThrow("Unknown provider");
+  });
+
+  it("returns 401 for bad signature even when PUSHOVER_TOKEN is missing (P2-3)", async () => {
+    const { raw } = loadFixture("monitor-down.json");
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": "a".repeat(64) });
+    const env: Env = { ...baseEnv, PROVIDER: "pushover" }; // no PUSHOVER_TOKEN
     const res = await handle(req, env, raw);
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(body["providersDispatched"]).toBe(1);
-    expect(body["providersFailed"]).toBe(1);
-    const results = body["results"] as Array<Record<string, unknown>>;
-    const unknown = results.find((r) => r["provider"] === "nonexistent");
-    expect(unknown).toEqual({ provider: "nonexistent", status: 0, error: "unknown provider" });
+    expect(res.status).toBe(401);
   });
 
   it("throws when pushover configured but PUSHOVER_TOKEN missing", async () => {

@@ -46,25 +46,29 @@ function format(payload: WebhookPayload): { title: string; message: string } {
         message: `Kill switch ${state}\nPath: ${payload.sentinel_path} | Detected: ${payload.detected_at}${actor}`,
       };
     }
-    case "account_suspended":
+    case "account_suspended": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
       return {
         title: "Account Suspended",
-        message: `Account #${payload.account_id} suspended (monitor #${payload.monitor_id}).\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
+        message: `Account #${payload.account_id} suspended${monitorSeg}.\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
       };
-    case "cap_hit":
+    }
+    case "cap_hit": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
       return {
         title: "Monitor Cap Hit",
-        message: `Monitor cap hit. Account #${payload.account_id} has ${payload.monitors_current} monitors (monitor #${payload.monitor_id}).\nDetected: ${payload.detected_at}`,
+        message: `Monitor cap hit. Account #${payload.account_id} has ${payload.monitors_current} monitors${monitorSeg}.\nDetected: ${payload.detected_at}`,
       };
+    }
     case "fleet_util_exceeded":
       return {
         title: "Fleet Utilization Exceeded",
-        message: `Fleet utilization EXCEEDED: ${payload.util}% over ${payload.window_hours}h window.\nDetected: ${payload.detected_at}`,
+        message: `Fleet utilization EXCEEDED: ${(payload.util * 100).toFixed(1)}% over ${payload.window_hours}h window.\nDetected: ${payload.detected_at}`,
       };
     case "fleet_util_recovered":
       return {
         title: "Fleet Utilization Recovered",
-        message: `Fleet utilization recovered: ${payload.util}% over ${payload.window_hours}h window.\nDetected: ${payload.detected_at}`,
+        message: `Fleet utilization recovered: ${(payload.util * 100).toFixed(1)}% over ${payload.window_hours}h window.\nDetected: ${payload.detected_at}`,
       };
     default: {
       const exhausted: never = payload;
@@ -92,7 +96,7 @@ export const pushover: Provider = {
     }
   },
 
-  async send(payload: WebhookPayload, env: Env): Promise<{ provider: string; status: number }> {
+  async send(payload: WebhookPayload, env: Env): Promise<{ ok: true } | { ok: false; reason: string }> {
     const { token, user } = getCredentials(env);
     const priority = getPriority(payload);
     const { title, message } = format(payload);
@@ -118,8 +122,8 @@ export const pushover: Provider = {
     });
 
     if (res.ok) {
-      return { provider: "pushover", status: res.status };
+      return { ok: true };
     }
-    throw new Error(`pushover ${res.status}: ${await res.text()}`);
+    return { ok: false, reason: `pushover ${res.status}: ${await res.text()}` };
   },
 };

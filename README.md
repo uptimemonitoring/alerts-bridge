@@ -6,7 +6,7 @@ Webhook bridge that accepts Monitive deliveries and dispatches to a notification
 
 ## Providers
 
-Providers are plugins that implement the `Provider` contract. Multiple providers can be configured simultaneously via a comma-separated `PROVIDER` env var (e.g. `PROVIDER=pushover,slack`).
+Providers are plugins that implement the `Provider` contract. Multiple providers can be configured simultaneously via a comma-separated `PROVIDER` env var (e.g. `PROVIDER=pushover`). Slack support lands in Phase 2b.
 
 ### Pushover
 

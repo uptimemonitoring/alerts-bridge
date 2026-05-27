@@ -98,8 +98,9 @@ export interface Env {
   TELEGRAM_CHAT_ID?: string;
 }
 
+/** Implemented by every notification backend. Resolve; never throw. */
 export interface Provider {
   readonly name: string;
-  send(payload: WebhookPayload, env: Env): Promise<{ provider: string; status: number }>;
+  send(payload: WebhookPayload, env: Env): Promise<{ ok: true } | { ok: false; reason: string }>;
   validateEnv?(env: Env): void;
 }

@@ -57,7 +57,7 @@ const capHitPayload: WebhookPayload = {
 const fleetUtilExceededPayload: WebhookPayload = {
   event: "fleet_util_exceeded",
   state: "breached",
-  util: 95.5,
+  util: 0.95,
   window_hours: 24,
   detected_at: "2026-04-12T14:23:11Z",
 };
@@ -65,7 +65,7 @@ const fleetUtilExceededPayload: WebhookPayload = {
 const fleetUtilRecoveredPayload: WebhookPayload = {
   event: "fleet_util_recovered",
   state: "ok",
-  util: 45.2,
+  util: 0.452,
   window_hours: 24,
   detected_at: "2026-04-12T14:23:11Z",
 };
@@ -244,19 +244,54 @@ describe("pushover — title formats", () => {
 });
 
 describe("pushover — success and error paths", () => {
-  it("returns { provider: 'pushover', status: 200 } on success", async () => {
+  it("returns { ok: true } on success", async () => {
     mockFetch(200, JSON.stringify({ status: 1 }));
     const result = await pushover.send(downPayload, BASE_ENV);
-    expect(result).toEqual({ provider: "pushover", status: 200 });
+    expect(result).toEqual({ ok: true });
   });
 
-  it("throws with status code and body on non-2xx response", async () => {
+  it("returns { ok: false, reason } on non-2xx response", async () => {
     mockFetch(503, "Service Unavailable");
-    await expect(pushover.send(downPayload, BASE_ENV)).rejects.toThrow("pushover 503: Service Unavailable");
+    const result = await pushover.send(downPayload, BASE_ENV);
+    expect(result).toEqual({ ok: false, reason: "pushover 503: Service Unavailable" });
   });
 
-  it("error message contains upstream body text", async () => {
+  it("reason contains upstream body text", async () => {
     mockFetch(400, "app token invalid");
-    await expect(pushover.send(downPayload, BASE_ENV)).rejects.toThrow("app token invalid");
+    const result = await pushover.send(downPayload, BASE_ENV);
+    expect((result as { ok: false; reason: string }).reason).toContain("app token invalid");
+  });
+});
+
+describe("pushover — util rendering", () => {
+  it("renders 0.95 as 95.0%", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(fleetUtilExceededPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("95.0%");
+  });
+
+  it("renders 1.0 as 100.0%", async () => {
+    const payload: WebhookPayload = { ...fleetUtilExceededPayload, util: 1.0 };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("100.0%");
+  });
+});
+
+describe("pushover — monitor_id sentinel (0)", () => {
+  it("account_suspended omits #0 in message", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspendedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).not.toContain("#0");
+  });
+
+  it("cap_hit omits #0 in message", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(capHitPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).not.toContain("#0");
   });
 });
