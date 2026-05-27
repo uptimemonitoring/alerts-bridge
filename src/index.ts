@@ -30,8 +30,14 @@ export async function handle(req: Request, env: import("./types.js").Env, raw: U
   type ProviderResult = { provider: string; ok: true } | { provider: string; ok: false; reason: string };
   const tasks = cfg.providers.map(async (name): Promise<ProviderResult> => {
     const p = lookupProvider(name)!; // safe: loadConfig threw for any unknown name
-    const r = await p.send(v.payload, env);
-    return r.ok ? { provider: name, ok: true } : { provider: name, ok: false, reason: r.reason };
+    try {
+      const r = await p.send(v.payload, env);
+      return r.ok ? { provider: name, ok: true } : { provider: name, ok: false, reason: r.reason };
+    } catch (err) {
+      // Provider threw (timeout, DNS, body-read error). Convert to structured failure
+      // so the dispatcher's 500-with-body contract holds even on rejection.
+      return { provider: name, ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   const settled = await Promise.all(tasks);
