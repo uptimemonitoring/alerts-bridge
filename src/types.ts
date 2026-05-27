@@ -97,3 +97,10 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
 }
+
+/** Implemented by every notification backend. Resolve; never throw. */
+export interface Provider {
+  readonly name: string;
+  send(payload: WebhookPayload, env: Env): Promise<{ ok: true } | { ok: false; reason: string }>;
+  validateEnv?(env: Env): void;
+}
