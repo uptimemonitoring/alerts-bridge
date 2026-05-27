@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { handle } from "../src/index.js";
 import type { Env } from "../src/types.js";
 
@@ -116,5 +116,94 @@ describe("handle — missing secrets", () => {
     const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
     const res = await handle(req, {}, raw);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("handle — provider dispatch", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const pushoverEnv: Env = {
+    ...baseEnv,
+    PROVIDER: "pushover",
+    PUSHOVER_TOKEN: "test-token",
+    PUSHOVER_USER: "test-user",
+  };
+
+  it("returns 200 with empty results when no providers configured", async () => {
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const res = await handle(req, baseEnv, raw);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body["providersDispatched"]).toBe(0);
+    expect(body["providersFailed"]).toBe(0);
+    expect(body["results"]).toEqual([]);
+    expect(body["note"]).toBe("no providers configured");
+  });
+
+  it("dispatches to pushover and returns 200 with providersDispatched:1", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ status: 1 }), { status: 200 }));
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const res = await handle(req, pushoverEnv, raw);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body["providersDispatched"]).toBe(1);
+    expect(body["providersFailed"]).toBe(0);
+    const results = body["results"] as Array<Record<string, unknown>>;
+    expect(results[0]).toEqual({ provider: "pushover", status: 200 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("api.pushover.net"),
+      expect.any(Object),
+    );
+  });
+
+  it("returns 500 when pushover returns 503", async () => {
+    fetchMock.mockResolvedValue(new Response("server error", { status: 503 }));
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const res = await handle(req, pushoverEnv, raw);
+    expect(res.status).toBe(500);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body["providersFailed"]).toBe(1);
+    expect(body["providersDispatched"]).toBe(0);
+    const results = body["results"] as Array<Record<string, unknown>>;
+    expect(String(results[0]?.["error"])).toContain("503");
+  });
+
+  it("returns 200 with mixed results for pushover + unknown provider", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ status: 1 }), { status: 200 }));
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const env: Env = { ...pushoverEnv, PROVIDER: "pushover,nonexistent" };
+    const res = await handle(req, env, raw);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body["providersDispatched"]).toBe(1);
+    expect(body["providersFailed"]).toBe(1);
+    const results = body["results"] as Array<Record<string, unknown>>;
+    const unknown = results.find((r) => r["provider"] === "nonexistent");
+    expect(unknown).toEqual({ provider: "nonexistent", status: 0, error: "unknown provider" });
+  });
+
+  it("throws when pushover configured but PUSHOVER_TOKEN missing", async () => {
+    const { raw, buf } = loadFixture("monitor-down.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const env: Env = { ...baseEnv, PROVIDER: "pushover", PUSHOVER_USER: "user-key" };
+    await expect(handle(req, env, raw)).rejects.toThrow("PUSHOVER_TOKEN");
   });
 });

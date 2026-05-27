@@ -97,3 +97,9 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
 }
+
+export interface Provider {
+  readonly name: string;
+  send(payload: WebhookPayload, env: Env): Promise<{ provider: string; status: number }>;
+  validateEnv?(env: Env): void;
+}
