@@ -16,4 +16,4 @@ Providers are plugins that implement the `Provider` contract. Multiple providers
 | `PUSHOVER_TOKEN` | Pushover application API token |
 | `PUSHOVER_USER` | Pushover user or group key |
 
-Pushover delivers push notifications to iOS, Android, and desktop. Down alerts and security emergencies use Pushover's emergency priority — the message retries every 30 seconds for up to 30 minutes and requires acknowledgment, bypassing Do Not Disturb. Pushover is a one-time purchase of $4.99 per platform (iOS/Android/Desktop client app); the API is free.
+Pushover delivers push notifications to iOS, Android, and desktop. Down alerts and security emergencies use Pushover's emergency priority — the message retries every 30 seconds (up to Pushover's 50-retry / ~25-minute cap) and requires acknowledgment, bypassing Do Not Disturb. Pushover is a one-time purchase of $4.99 per platform (iOS/Android/Desktop client app); the API is free.
