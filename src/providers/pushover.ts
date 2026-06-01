@@ -5,8 +5,9 @@ const TITLE_MAX = 250;
 const MESSAGE_MAX = 1024;
 
 function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 1) + "…";
+  const cp = Array.from(s);
+  if (cp.length <= max) return s;
+  return cp.slice(0, max - 1).join("") + "…";
 }
 
 function getPriority(payload: WebhookPayload): number {

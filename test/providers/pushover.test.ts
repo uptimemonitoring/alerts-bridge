@@ -280,6 +280,26 @@ describe("pushover — util rendering", () => {
   });
 });
 
+describe("pushover — Unicode-safe truncation", () => {
+  it("does not emit lone surrogates when monitor name contains astral code points", async () => {
+    // Each emoji is an astral code point (2 UTF-16 code units). A name of 260 emojis
+    // forces truncation and would produce a lone surrogate with the old slice() logic.
+    const longEmojiName = "🔥".repeat(260);
+    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    const title = body["title"]!;
+    const noLoneSurrogate = Array.from(title).every((ch) => {
+      const cp = ch.codePointAt(0)!;
+      return cp < 0xd800 || cp > 0xdfff;
+    });
+    expect(noLoneSurrogate).toBe(true);
+    expect(title.length).toBeLessThanOrEqual(250 * 2); // at most 250 code points, each ≤2 UTF-16 units
+    expect(Array.from(title).join("")).toBe(title); // round-trips cleanly
+  });
+});
+
 describe("pushover — monitor_id sentinel (0)", () => {
   it("account_suspended omits #0 in message", async () => {
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
