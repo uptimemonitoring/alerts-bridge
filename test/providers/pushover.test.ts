@@ -282,9 +282,14 @@ describe("pushover — util rendering", () => {
 
 describe("pushover — Unicode-safe truncation", () => {
   it("does not emit lone surrogates when monitor name contains astral code points", async () => {
-    // Each emoji is an astral code point (2 UTF-16 code units). A name of 260 emojis
-    // forces truncation and would produce a lone surrogate with the old slice() logic.
-    const longEmojiName = "🔥".repeat(260);
+    // Each emoji is one astral code point = 2 UTF-16 code units. The down title is
+    // `[DOWN] ` + name. We prepend a single ASCII char to the name so the emoji run
+    // starts at an EVEN UTF-16 offset (`[DOWN] ` is 7 units + "x" = 8). The naive
+    // slice(0, TITLE_MAX - 1) = slice(0, 249) then cuts at offset 249-8 = 241 — an
+    // ODD position inside the emoji run, i.e. mid surrogate pair. So the old
+    // string-slice implementation WOULD emit a lone surrogate here; the code-point
+    // implementation must not. This parity is what makes the test catch the bug.
+    const longEmojiName = "x" + "🔥".repeat(260);
     const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
     await pushover.send(payload, BASE_ENV);
@@ -295,8 +300,8 @@ describe("pushover — Unicode-safe truncation", () => {
       return cp < 0xd800 || cp > 0xdfff;
     });
     expect(noLoneSurrogate).toBe(true);
-    expect(title.length).toBeLessThanOrEqual(250 * 2); // at most 250 code points, each ≤2 UTF-16 units
-    expect(Array.from(title).join("")).toBe(title); // round-trips cleanly
+    // Code-point cap: TITLE_MAX-1 retained code points + the "…" ellipsis = exactly 250.
+    expect(Array.from(title).length).toBe(250);
   });
 });
 
