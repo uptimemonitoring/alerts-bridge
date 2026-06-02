@@ -92,6 +92,7 @@ export interface Env {
   PUSHOVER_USER?: string;
   NTFY_URL?: string;
   NTFY_TOPIC?: string;
+  NTFY_TOKEN?: string;
   SLACK_WEBHOOK_URL?: string;
   DISCORD_WEBHOOK_URL?: string;
   TELEGRAM_BOT_TOKEN?: string;
