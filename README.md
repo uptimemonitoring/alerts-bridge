@@ -2,7 +2,7 @@
 
 Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source, runs on Cloudflare Workers / Vercel / Deno Deploy / AWS Lambda / VPS.
 
-**Phase 2b — Pushover and ntfy providers live; Slack/Discord/Telegram next.**
+**Phase 2c — Pushover, ntfy, and Slack providers live; Discord/Telegram next.**
 
 ## Providers
 
