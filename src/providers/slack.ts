@@ -33,6 +33,7 @@ function format(payload: WebhookPayload): { title: string; text: string } {
       let text = `${name} is DOWN`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      text += `\nDetected: ${payload.occurred_at}`;
       return { title: `[DOWN] ${name}`, text };
     }
     case "monitor.up": {
@@ -40,6 +41,7 @@ function format(payload: WebhookPayload): { title: string; text: string } {
       let text = `${name} is UP`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      text += `\nDetected: ${payload.occurred_at}`;
       return { title: `[UP] ${name}`, text };
     }
     case "monitor.flapping": {
@@ -47,6 +49,7 @@ function format(payload: WebhookPayload): { title: string; text: string } {
       let text = `${name} is FLAPPING`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      text += `\nDetected: ${payload.occurred_at}`;
       return { title: `[FLAPPING] ${name}`, text };
     }
     case "kill_switch_flipped": {

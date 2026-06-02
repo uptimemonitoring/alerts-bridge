@@ -90,12 +90,14 @@ function validateMonitorPayload(
 
   const optStr = (key: string): string | undefined | null => {
     const v = body[key];
-    if (v === undefined) return undefined;
+    // null is treated as absent (degrade gracefully) — JSON null from an
+    // upstream that serializes empty optionals as null must not 400.
+    if (v === undefined || v === null) return undefined;
     return typeof v === "string" ? v : null;
   };
   const optInt = (key: string): number | undefined | null => {
     const v = body[key];
-    if (v === undefined) return undefined;
+    if (v === undefined || v === null) return undefined;
     if (!Number.isSafeInteger(v) || (v as number) < 0) return null;
     return v as number;
   };

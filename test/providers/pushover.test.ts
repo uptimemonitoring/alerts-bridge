@@ -374,3 +374,12 @@ describe("pushover — monitor_id sentinel (0)", () => {
     expect(body["message"]).not.toContain("#0");
   });
 });
+
+describe("pushover — occurred_at in monitor message", () => {
+  it("includes the detected timestamp in a down alert", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await pushover.send(payload, BASE_ENV);
+    expect(parseBody(fetchMock)["message"]).toContain("2026-04-12T14:23:11Z");
+  });
+});

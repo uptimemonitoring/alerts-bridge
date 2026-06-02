@@ -317,3 +317,18 @@ describe("validate — RFC3339 strict date validation (codex fix)", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("validate — null optionals degrade (not 400)", () => {
+  // An upstream that serializes empty optionals as JSON null must not be
+  // rejected — null is treated as absent so the provider's fallback applies.
+  it("accepts monitor.down with null optional fields", () => {
+    const body = '{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T00:00:00Z","monitor_name":null,"monitor_url":null,"reason":null,"account_id":null,"delivery_id":null,"attempt":null}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      // null optionals are dropped, not carried through as null.
+      expect("monitor_name" in r.payload).toBe(false);
+      expect("monitor_url" in r.payload).toBe(false);
+    }
+  });
+});
