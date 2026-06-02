@@ -3,8 +3,9 @@ import { discord } from "./discord.js";
 import { ntfy } from "./ntfy.js";
 import { pushover } from "./pushover.js";
 import { slack } from "./slack.js";
+import { telegram } from "./telegram.js";
 
-export const providers: Record<string, Provider> = { pushover, ntfy, slack, discord };
+export const providers: Record<string, Provider> = { pushover, ntfy, slack, discord, telegram };
 
 export function lookupProvider(name: string): Provider | undefined {
   return providers[name.toLowerCase()];

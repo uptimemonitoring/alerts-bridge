@@ -2,7 +2,7 @@
 
 Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source, runs on Cloudflare Workers / Vercel / Deno Deploy / AWS Lambda / VPS.
 
-**Phase 2d — Pushover, ntfy, Slack, and Discord providers live; Telegram next.**
+**Phase 2e — Pushover, ntfy, Slack, Discord, and Telegram providers live.**
 
 ## Providers
 
@@ -64,3 +64,13 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 | Red (`#E01E5A`) | `down`, `kill_switch_flipped` (active), `account_suspended` |
 | Amber (`#F2C744`) | `cap_hit`, `fleet_util_exceeded` |
 | Green (`#2EB67D`) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+
+### Telegram *(internal-mainly)*
+
+| Variable | Description |
+|---|---|
+| `PROVIDER` | Set to `telegram` (or include in a comma-separated list) |
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_CHAT_ID` | Target chat, group, or channel ID (e.g. `-1001234567890`) |
+
+Telegram delivers alerts as plain-text messages via the [Bot API](https://core.telegram.org/bots/api#sendmessage) `sendMessage` endpoint. Messages are sent without `parse_mode`, so monitor names containing Markdown metacharacters (`_`, `*`, `[`, `]`, `` ` ``) are delivered verbatim and cannot cause API errors. Primarily intended for internal/ops use rather than end-user notification.
