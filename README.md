@@ -2,7 +2,7 @@
 
 Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source, runs on Cloudflare Workers / Vercel / Deno Deploy / AWS Lambda / VPS.
 
-**Phase 2c — Pushover, ntfy, and Slack providers live; Discord/Telegram next.**
+**Phase 2d — Pushover, ntfy, Slack, and Discord providers live; Telegram next.**
 
 ## Providers
 
@@ -49,3 +49,18 @@ Slack delivers alerts as message attachments with severity colors via an [Incomi
 | `danger` (red) | `down`, `kill_switch_flipped` (active), `account_suspended` |
 | `warning` (yellow) | `cap_hit`, `fleet_util_exceeded` |
 | `good` (green) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+
+### Discord
+
+| Variable | Description |
+|---|---|
+| `PROVIDER` | Set to `discord` (or include in a comma-separated list) |
+| `DISCORD_WEBHOOK_URL` | Incoming Webhook URL from your Discord channel settings |
+
+Discord delivers alerts as rich embeds with a color-coded left border via an [Incoming Webhook](https://discord.com/developers/docs/resources/webhook). Create a webhook in your channel's Integration settings and copy the URL into `DISCORD_WEBHOOK_URL`. Alerts are color-coded:
+
+| Color | Events |
+|---|---|
+| Red (`#E01E5A`) | `down`, `kill_switch_flipped` (active), `account_suspended` |
+| Amber (`#F2C744`) | `cap_hit`, `fleet_util_exceeded` |
+| Green (`#2EB67D`) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
