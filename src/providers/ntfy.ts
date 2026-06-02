@@ -2,6 +2,11 @@ import type { Env, Provider, WebhookPayload } from "../types.js";
 
 const NTFY_DEFAULT_URL = "https://ntfy.sh";
 const TITLE_MAX = 250;
+// ntfy treats messages over 4096 bytes as a file attachment rather than a plain
+// notification. Cap at 1024 code points (≤4096 bytes even for all-astral input),
+// matching the Pushover provider's message bound, so a pathological monitor name
+// can't silently convert an alert into an attachment.
+const MESSAGE_MAX = 1024;
 
 function truncate(s: string, max: number): string {
   const cp = Array.from(s);
@@ -126,7 +131,7 @@ export const ntfy: Provider = {
     const body = JSON.stringify({
       topic: env.NTFY_TOPIC!.trim(),
       title: truncate(title, TITLE_MAX),
-      message,
+      message: truncate(message, MESSAGE_MAX),
       priority: getPriority(payload),
       tags: getTags(payload),
     });

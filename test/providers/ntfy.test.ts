@@ -243,6 +243,16 @@ describe("ntfy — outbound shape", () => {
     await ntfy.send(payload, BASE_ENV);
     expect(Array.from(parseJson(fetchMock).title!).length).toBeLessThanOrEqual(250);
   });
+
+  it("truncates message over 1024 chars so it stays a notification (ntfy attaches >4096 bytes)", async () => {
+    // The name is embedded in the message body too; a pathological name must not
+    // push the message past ntfy's notification/attachment threshold.
+    const longName = "a".repeat(5000);
+    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const fetchMock = mockFetch(200);
+    await ntfy.send(payload, BASE_ENV);
+    expect(Array.from(parseJson(fetchMock).message!).length).toBeLessThanOrEqual(1024);
+  });
 });
 
 describe("ntfy — success and error paths", () => {
