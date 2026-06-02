@@ -1,0 +1,32 @@
+name = "alerts-bridge"
+main = "src/runtimes/cloudflare.ts"
+compatibility_date = "2025-01-01"
+
+# Runtime environment variables
+#
+# All secrets must be set via `npx wrangler secret put <NAME>` — do NOT commit
+# them here. [vars] is for non-secret defaults only and may be omitted.
+#
+# Required for every deployment:
+#   npx wrangler secret put PROVIDER                   # e.g. "pushover" or "pushover,ntfy"
+#   npx wrangler secret put MONITOR_WEBHOOK_SECRETS    # comma-separated HMAC secret(s)
+#   npx wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS  # comma-separated HMAC secret(s)
+#
+# Pushover provider:
+#   npx wrangler secret put PUSHOVER_TOKEN
+#   npx wrangler secret put PUSHOVER_USER
+#
+# ntfy provider:
+#   npx wrangler secret put NTFY_TOPIC
+#   npx wrangler secret put NTFY_TOKEN   # optional, only for protected topics
+#   # NTFY_URL defaults to https://ntfy.sh — override only for self-hosted
+#
+# Slack provider:
+#   npx wrangler secret put SLACK_WEBHOOK_URL
+#
+# Discord provider:
+#   npx wrangler secret put DISCORD_WEBHOOK_URL
+#
+# Telegram provider:
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_CHAT_ID
