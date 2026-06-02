@@ -38,10 +38,10 @@ export async function verifySignature(
   // Reject non-hex or wrong-length before constant-time comparison.
   if (!HEX_RE.test(signatureHeader)) return false;
 
-  // Sign the raw bytes directly — same as the Go upstream (um-api/internal/webhook/sign.go).
+  // Sign the raw request bytes directly — this is the documented signing contract.
   // Re-serializing through JSON.parse/stringify is wrong: any whitespace or escape
-  // divergence between Go's json.Marshal and JS's JSON.stringify produces a different
-  // byte sequence and causes 401s on legitimate deliveries.
+  // divergence between the sender's serializer and JS's JSON.stringify produces a
+  // different byte sequence and causes 401s on legitimate deliveries.
   const bodyBuffer = rawBody.buffer instanceof ArrayBuffer
     ? (rawBody as Uint8Array<ArrayBuffer>)
     : (new Uint8Array(rawBody) as Uint8Array<ArrayBuffer>);

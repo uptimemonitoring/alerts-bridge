@@ -19,7 +19,7 @@ function makeReq(
 
 const MONITOR_DOWN = '{"event":"monitor.down","monitor_id":1287,"occurred_at":"2026-04-12T14:23:11Z","reason":"http_5xx","monitor_name":"myapp-healthz"}';
 const MONITOR_UP   = '{"event":"monitor.up","monitor_id":1287,"occurred_at":"2026-04-12T14:31:02Z","monitor_name":"myapp-healthz"}';
-const KILL_SWITCH  = '{"event":"kill_switch_flipped","active":true,"sentinel_path":"/var/lib/monitive/kill","detected_at":"2026-04-12T14:23:11Z","actor":"lucianmd"}';
+const KILL_SWITCH  = '{"event":"kill_switch_flipped","active":true,"sentinel_path":"/var/lib/example/kill","detected_at":"2026-04-12T14:23:11Z","actor":"admin"}';
 
 describe("validate — method", () => {
   it("rejects GET with 405", () => {

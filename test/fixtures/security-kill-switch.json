@@ -1,1 +1,1 @@
-{"event":"kill_switch_flipped","active":true,"sentinel_path":"/var/lib/monitive/kill","detected_at":"2026-04-12T14:23:11Z","actor":"lucianmd"}
+{"event":"kill_switch_flipped","active":true,"sentinel_path":"/var/lib/example/kill","detected_at":"2026-04-12T14:23:11Z","actor":"admin"}
