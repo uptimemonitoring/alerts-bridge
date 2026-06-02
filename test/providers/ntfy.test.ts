@@ -77,6 +77,18 @@ function parseBody(fetchMock: ReturnType<typeof vi.fn>): string {
   return fetchMock.mock.calls[0]?.[1]?.body as string ?? "";
 }
 
+// ntfy is published via the JSON format: the request body is a JSON document
+// carrying topic/title/message/priority/tags. Parse it for assertions.
+function parseJson(fetchMock: ReturnType<typeof vi.fn>): {
+  topic?: string;
+  title?: string;
+  message?: string;
+  priority?: number;
+  tags?: string[];
+} {
+  return JSON.parse(parseBody(fetchMock) || "{}");
+}
+
 function mockFetch(status: number, text = ""): ReturnType<typeof vi.fn> {
   const mock = vi.fn().mockResolvedValue(new Response(text, { status }));
   vi.stubGlobal("fetch", mock);
@@ -98,6 +110,10 @@ describe("ntfy — validateEnv", () => {
 
   it("throws when NTFY_TOPIC is empty string", () => {
     expect(() => ntfy.validateEnv?.({ NTFY_TOPIC: "" })).toThrow("NTFY_TOPIC");
+  });
+
+  it("throws when NTFY_TOPIC is whitespace only", () => {
+    expect(() => ntfy.validateEnv?.({ NTFY_TOPIC: "   " })).toThrow("NTFY_TOPIC");
   });
 
   it("does not throw when NTFY_TOPIC is present", () => {
@@ -124,8 +140,7 @@ describe("ntfy — priority mapping", () => {
   ] as const)("%s → priority %i", async (_label, payload, expectedPriority) => {
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
-    const headers = parseHeaders(fetchMock);
-    expect(headers["Priority"]).toBe(String(expectedPriority));
+    expect(parseJson(fetchMock).priority).toBe(expectedPriority);
   });
 });
 
@@ -142,34 +157,37 @@ describe("ntfy — tags", () => {
   ] as const)("%s → contains tag %s", async (_label, payload, expectedTag) => {
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
-    const headers = parseHeaders(fetchMock);
-    expect(headers["Tags"]).toContain(expectedTag);
+    expect(parseJson(fetchMock).tags).toContain(expectedTag);
   });
 });
 
-describe("ntfy — URL construction", () => {
-  it("uses https://ntfy.sh/<topic> when NTFY_URL is not set", async () => {
+describe("ntfy — URL + topic routing", () => {
+  // JSON publishing POSTs to the ROOT url; the topic is carried in the JSON body,
+  // not the URL path. So the URL never contains the topic.
+  it("POSTs to https://ntfy.sh (root) when NTFY_URL is not set", async () => {
     const fetchMock = mockFetch(200);
     await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts" });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.sh/my-alerts");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.sh");
+    expect(parseJson(fetchMock).topic).toBe("my-alerts");
   });
 
-  it("uses custom NTFY_URL with topic appended", async () => {
+  it("POSTs to a custom NTFY_URL root", async () => {
     const fetchMock = mockFetch(200);
     await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts", NTFY_URL: "https://ntfy.example.com" });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com/my-alerts");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com");
+    expect(parseJson(fetchMock).topic).toBe("my-alerts");
   });
 
-  it("strips trailing slash from NTFY_URL to avoid double slash", async () => {
-    const fetchMock = mockFetch(200);
-    await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts", NTFY_URL: "https://ntfy.example.com/" });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com/my-alerts");
-  });
-
-  it("strips multiple trailing slashes from NTFY_URL", async () => {
+  it("strips trailing slash(es) from NTFY_URL to avoid double slash", async () => {
     const fetchMock = mockFetch(200);
     await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts", NTFY_URL: "https://ntfy.example.com///" });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com/my-alerts");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com");
+  });
+
+  it("trims whitespace from the topic in the JSON body", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(downPayload, { NTFY_TOPIC: "  my-alerts  " });
+    expect(parseJson(fetchMock).topic).toBe("my-alerts");
   });
 });
 
@@ -187,6 +205,12 @@ describe("ntfy — Authorization header", () => {
     const headers = parseHeaders(fetchMock);
     expect(headers["Authorization"]).toBeUndefined();
   });
+
+  it("trims whitespace from NTFY_TOKEN", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(downPayload, { ...BASE_ENV, NTFY_TOKEN: "  my-secret\n" });
+    expect(parseHeaders(fetchMock)["Authorization"]).toBe("Bearer my-secret");
+  });
 });
 
 describe("ntfy — outbound shape", () => {
@@ -196,19 +220,20 @@ describe("ntfy — outbound shape", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST");
   });
 
-  it("sends Title header", async () => {
+  it("sends Content-Type: application/json", async () => {
     const fetchMock = mockFetch(200);
     await ntfy.send(downPayload, BASE_ENV);
-    const headers = parseHeaders(fetchMock);
-    expect(headers["Title"]).toBeDefined();
+    expect(parseHeaders(fetchMock)["Content-Type"]).toBe("application/json");
   });
 
-  it("sends message as plain text body", async () => {
+  it("carries title and message in the JSON body", async () => {
     const fetchMock = mockFetch(200);
     await ntfy.send(downPayload, BASE_ENV);
-    const body = parseBody(fetchMock);
-    expect(typeof body).toBe("string");
-    expect(body.length).toBeGreaterThan(0);
+    const json = parseJson(fetchMock);
+    expect(typeof json.title).toBe("string");
+    expect(json.title!.length).toBeGreaterThan(0);
+    expect(typeof json.message).toBe("string");
+    expect(json.message!.length).toBeGreaterThan(0);
   });
 
   it("truncates title over 250 chars", async () => {
@@ -216,8 +241,7 @@ describe("ntfy — outbound shape", () => {
     const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
-    const headers = parseHeaders(fetchMock);
-    expect(Array.from(headers["Title"]!).length).toBeLessThanOrEqual(250);
+    expect(Array.from(parseJson(fetchMock).title!).length).toBeLessThanOrEqual(250);
   });
 });
 
@@ -243,7 +267,18 @@ describe("ntfy — success and error paths", () => {
   });
 });
 
-describe("ntfy — Unicode-safe truncation", () => {
+describe("ntfy — UTF-8 title in JSON body", () => {
+  it("carries an emoji/non-ASCII title intact in the JSON body (would crash if sent as a header)", async () => {
+    // Emoji and non-Latin-1 chars cannot go in an HTTP header value (fetch/Headers
+    // throw a ByteString error). The JSON-body path must carry them untouched —
+    // this is the regression guard against reverting to a header-based Title.
+    const name = "café 🔥 服务器";
+    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name } };
+    const fetchMock = mockFetch(200);
+    await ntfy.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).title).toContain(name);
+  });
+
   it("does not emit lone surrogates when monitor name contains astral code points", async () => {
     // Each emoji is one astral code point = 2 UTF-16 code units. "[DOWN] " is 7 units + "x" = 8.
     // The naive slice(0, 249) cuts at offset 249-8 = 241 — an odd position inside the emoji run,
@@ -252,8 +287,7 @@ describe("ntfy — Unicode-safe truncation", () => {
     const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
-    const headers = parseHeaders(fetchMock);
-    const title = headers["Title"]!;
+    const title = parseJson(fetchMock).title!;
     const noLoneSurrogate = Array.from(title).every((ch) => {
       const cp = ch.codePointAt(0)!;
       return cp < 0xd800 || cp > 0xdfff;

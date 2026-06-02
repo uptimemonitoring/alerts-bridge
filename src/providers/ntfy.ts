@@ -97,7 +97,7 @@ export const ntfy: Provider = {
   name: "ntfy",
 
   validateEnv(env: Env): void {
-    if (!env.NTFY_TOPIC) {
+    if (!env.NTFY_TOPIC || !env.NTFY_TOPIC.trim()) {
       throw new Error(
         "alerts-bridge: NTFY_TOPIC required when PROVIDER includes ntfy",
       );
@@ -105,23 +105,35 @@ export const ntfy: Provider = {
   },
 
   async send(payload: WebhookPayload, env: Env): Promise<{ ok: true } | { ok: false; reason: string }> {
-    const base = (env.NTFY_URL || NTFY_DEFAULT_URL).replace(/\/+$/, "");
-    const url = `${base}/${env.NTFY_TOPIC}`;
+    // Publish via ntfy's JSON format: POST to the root URL with a JSON body whose
+    // "topic" field selects the topic. Title/message travel as UTF-8 in the body,
+    // NOT as HTTP headers — fetch/Headers reject non-Latin-1 header values (emoji,
+    // CJK, CR/LF), so a header-based Title would fail to deliver for any monitor
+    // name outside ASCII. The body path is encoding-safe and also avoids
+    // interpolating the (untrusted) topic into the URL path.
+    const url = (env.NTFY_URL || NTFY_DEFAULT_URL).replace(/\/+$/, "");
     const { title, message } = format(payload);
 
     const headers: Record<string, string> = {
-      "Title": truncate(title, TITLE_MAX),
-      "Priority": String(getPriority(payload)),
-      "Tags": getTags(payload).join(","),
+      "Content-Type": "application/json",
     };
 
-    if (env.NTFY_TOKEN) {
-      headers["Authorization"] = `Bearer ${env.NTFY_TOKEN}`;
+    const token = env.NTFY_TOKEN?.trim();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
+
+    const body = JSON.stringify({
+      topic: env.NTFY_TOPIC!.trim(),
+      title: truncate(title, TITLE_MAX),
+      message,
+      priority: getPriority(payload),
+      tags: getTags(payload),
+    });
 
     const res = await fetch(url, {
       method: "POST",
-      body: message,
+      body,
       headers,
       signal: AbortSignal.timeout(10_000),
     });
