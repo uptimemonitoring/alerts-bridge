@@ -7,17 +7,25 @@ const BASE_ENV: Env = {
 };
 
 const downPayload: WebhookPayload = {
-  event: "down",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:23:11Z",
-  evidence: { primary_error: "http_5xx", status_code: 503, region: "US-E" },
+  event: "monitor.down",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:23:11Z",
+  reason: "http_5xx",
 };
 
 const upPayload: WebhookPayload = {
-  event: "up",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:31:02Z",
-  evidence: { primary_error: "", status_code: 200, region: "US-E" },
+  event: "monitor.up",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:31:02Z",
+};
+
+const flappingPayload: WebhookPayload = {
+  event: "monitor.flapping",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:35:00Z",
 };
 
 const killSwitchActivePayload: WebhookPayload = {
@@ -129,8 +137,9 @@ describe("ntfy — validateEnv", () => {
 
 describe("ntfy — priority mapping", () => {
   it.each([
-    ["down", downPayload, 5],
-    ["up", upPayload, 3],
+    ["monitor.down", downPayload, 5],
+    ["monitor.up", upPayload, 3],
+    ["monitor.flapping", flappingPayload, 4],
     ["kill_switch_flipped active=true", killSwitchActivePayload, 5],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 3],
     ["account_suspended", accountSuspendedPayload, 5],
@@ -146,8 +155,9 @@ describe("ntfy — priority mapping", () => {
 
 describe("ntfy — tags", () => {
   it.each([
-    ["down", downPayload, "rotating_light"],
-    ["up", upPayload, "white_check_mark"],
+    ["monitor.down", downPayload, "rotating_light"],
+    ["monitor.up", upPayload, "white_check_mark"],
+    ["monitor.flapping", flappingPayload, "warning"],
     ["kill_switch_flipped active=true", killSwitchActivePayload, "lock"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "unlock"],
     ["account_suspended", accountSuspendedPayload, "no_entry"],
@@ -250,20 +260,54 @@ describe("ntfy — outbound shape", () => {
 
   it("truncates title over 250 chars", async () => {
     const longName = "a".repeat(300);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
     expect(Array.from(parseJson(fetchMock).title!).length).toBeLessThanOrEqual(250);
   });
 
   it("truncates message over 1024 chars so it stays a notification (ntfy attaches >4096 bytes)", async () => {
-    // The name is embedded in the message body too; a pathological name must not
-    // push the message past ntfy's notification/attachment threshold.
     const longName = "a".repeat(5000);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
     expect(Array.from(parseJson(fetchMock).message!).length).toBeLessThanOrEqual(1024);
+  });
+});
+
+describe("ntfy — monitor name and reason", () => {
+  it("name absent → title uses Monitor #id", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await ntfy.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).title).toBe("[DOWN] Monitor #1287");
+  });
+
+  it("name absent → message contains 'Monitor #id is DOWN'", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await ntfy.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).message).toContain("Monitor #1287 is DOWN");
+  });
+
+  it("reason present → message contains reason", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(downPayload, BASE_ENV);
+    expect(parseJson(fetchMock).message).toContain("http_5xx");
+  });
+
+  it("reason absent → message does not contain ' — '", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await ntfy.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).message).not.toContain(" — ");
+  });
+
+  it("flapping handled — ntfy sends", async () => {
+    const fetchMock = mockFetch(200);
+    const result = await ntfy.send(flappingPayload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalled();
   });
 });
 
@@ -295,7 +339,7 @@ describe("ntfy — UTF-8 title in JSON body", () => {
     // throw a ByteString error). The JSON-body path must carry them untouched —
     // this is the regression guard against reverting to a header-based Title.
     const name = "café 🔥 服务器";
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: name };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
     expect(parseJson(fetchMock).title).toContain(name);
@@ -306,7 +350,7 @@ describe("ntfy — UTF-8 title in JSON body", () => {
     // The naive slice(0, 249) cuts at offset 249-8 = 241 — an odd position inside the emoji run,
     // i.e. mid surrogate pair. The code-point implementation must not emit a lone surrogate.
     const longEmojiName = "x" + "🔥".repeat(260);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longEmojiName };
     const fetchMock = mockFetch(200);
     await ntfy.send(payload, BASE_ENV);
     const title = parseJson(fetchMock).title!;

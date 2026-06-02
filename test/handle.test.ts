@@ -49,7 +49,7 @@ describe("handle — monitor payload", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body["providersDispatched"]).toBe(0);
-    expect(body["event"]).toBe("down");
+    expect(body["event"]).toBe("monitor.down");
   });
 
   it("returns 401 when signature mismatched", async () => {

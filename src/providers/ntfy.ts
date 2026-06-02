@@ -16,8 +16,9 @@ function truncate(s: string, max: number): string {
 
 function getPriority(payload: WebhookPayload): number {
   switch (payload.event) {
-    case "down": return 5;
-    case "up": return 3;
+    case "monitor.down": return 5;
+    case "monitor.up": return 3;
+    case "monitor.flapping": return 4;
     case "kill_switch_flipped": return payload.active ? 5 : 3;
     case "account_suspended": return 5;
     case "cap_hit": return 4;
@@ -32,8 +33,9 @@ function getPriority(payload: WebhookPayload): number {
 
 function getTags(payload: WebhookPayload): string[] {
   switch (payload.event) {
-    case "down": return ["rotating_light"];
-    case "up": return ["white_check_mark"];
+    case "monitor.down": return ["rotating_light"];
+    case "monitor.up": return ["white_check_mark"];
+    case "monitor.flapping": return ["warning"];
     case "kill_switch_flipped": return payload.active ? ["lock"] : ["unlock"];
     case "account_suspended": return ["no_entry"];
     case "cap_hit": return ["chart_with_upwards_trend"];
@@ -48,16 +50,30 @@ function getTags(payload: WebhookPayload): string[] {
 
 function format(payload: WebhookPayload): { title: string; message: string } {
   switch (payload.event) {
-    case "down":
-      return {
-        title: `[DOWN] ${payload.monitor.name}`,
-        message: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is DOWN.\nError: ${payload.evidence.primary_error} | Status: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
-    case "up":
-      return {
-        title: `[UP] ${payload.monitor.name}`,
-        message: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is UP.\nStatus: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
+    case "monitor.down": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is DOWN`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      message += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[DOWN] ${name}`, message };
+    }
+    case "monitor.up": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is UP`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      message += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[UP] ${name}`, message };
+    }
+    case "monitor.flapping": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is FLAPPING`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      message += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[FLAPPING] ${name}`, message };
+    }
     case "kill_switch_flipped": {
       const state = payload.active ? "ACTIVATED" : "DEACTIVATED";
       const titleWord = payload.active ? "Activated" : "Deactivated";

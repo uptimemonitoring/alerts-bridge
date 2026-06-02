@@ -11,8 +11,9 @@ function truncate(s: string, max: number): string {
 
 function getColor(payload: WebhookPayload): number {
   switch (payload.event) {
-    case "down": return 0xE01E5A;
-    case "up": return 0x2EB67D;
+    case "monitor.down": return 0xE01E5A;
+    case "monitor.up": return 0x2EB67D;
+    case "monitor.flapping": return 0xF2C744;
     case "kill_switch_flipped": return payload.active ? 0xE01E5A : 0x2EB67D;
     case "account_suspended": return 0xE01E5A;
     case "cap_hit": return 0xF2C744;
@@ -27,16 +28,30 @@ function getColor(payload: WebhookPayload): number {
 
 function format(payload: WebhookPayload): { title: string; description: string } {
   switch (payload.event) {
-    case "down":
-      return {
-        title: `[DOWN] ${payload.monitor.name}`,
-        description: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is DOWN.\nError: ${payload.evidence.primary_error} | Status: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
-    case "up":
-      return {
-        title: `[UP] ${payload.monitor.name}`,
-        description: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is UP.\nStatus: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
+    case "monitor.down": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let description = `${name} is DOWN`;
+      if (payload.reason) description += ` — ${payload.reason}`;
+      if (payload.monitor_url) description += `\n${payload.monitor_url}`;
+      description += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[DOWN] ${name}`, description };
+    }
+    case "monitor.up": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let description = `${name} is UP`;
+      if (payload.reason) description += ` — ${payload.reason}`;
+      if (payload.monitor_url) description += `\n${payload.monitor_url}`;
+      description += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[UP] ${name}`, description };
+    }
+    case "monitor.flapping": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let description = `${name} is FLAPPING`;
+      if (payload.reason) description += ` — ${payload.reason}`;
+      if (payload.monitor_url) description += `\n${payload.monitor_url}`;
+      description += `\nDetected: ${payload.occurred_at}`;
+      return { title: `[FLAPPING] ${name}`, description };
+    }
     case "kill_switch_flipped": {
       const state = payload.active ? "ACTIVATED" : "DEACTIVATED";
       const titleWord = payload.active ? "Activated" : "Deactivated";

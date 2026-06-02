@@ -13,7 +13,7 @@ function utf8(s: string): Uint8Array {
   return new TextEncoder().encode(s);
 }
 
-const PAYLOAD = '{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T00:00:00Z","evidence":{"primary_error":"err","status_code":503,"region":"US-E"}}';
+const PAYLOAD = '{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T00:00:00Z","monitor_name":"x","reason":"http_5xx"}';
 const SECRET = "testsecret";
 const RAW = utf8(PAYLOAD);
 const SIG = sign(SECRET, RAW);

@@ -1,4 +1,4 @@
-export type MonitorEvent = "down" | "up";
+export type MonitorEvent = "monitor.down" | "monitor.up" | "monitor.flapping";
 
 export type SecurityEvent =
   | "kill_switch_flipped"
@@ -7,12 +7,16 @@ export type SecurityEvent =
   | "fleet_util_exceeded"
   | "fleet_util_recovered";
 
-// Pinned to webhooks.md:35-48
 export interface MonitorWebhookPayload {
   event: MonitorEvent;
-  monitor: { id: number; name: string };
-  detected_at: string;
-  evidence: { primary_error: string; status_code: number; region: string };
+  monitor_id: number;
+  occurred_at: string;
+  monitor_name?: string;
+  monitor_url?: string;
+  reason?: string;
+  account_id?: number;
+  delivery_id?: number;
+  attempt?: number;
 }
 
 // Pinned to alerter.go:32-37, 176-184
@@ -71,7 +75,7 @@ export type SecurityAlertPayload =
 export type WebhookPayload = MonitorWebhookPayload | SecurityAlertPayload;
 
 export function isMonitorEvent(s: string): s is MonitorEvent {
-  return s === "down" || s === "up";
+  return s === "monitor.down" || s === "monitor.up" || s === "monitor.flapping";
 }
 
 export function isSecurityEvent(s: string): s is SecurityEvent {
