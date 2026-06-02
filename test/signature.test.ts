@@ -19,6 +19,7 @@ const SECRET = "contractsecret";
 const fixtures = [
   "monitor-down.json",
   "monitor-up.json",
+  "monitor-flapping.json",
   "security-kill-switch.json",
 ] as const;
 
