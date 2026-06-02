@@ -1,4 +1,4 @@
-# alerts-bridge
+# UptimeMonitoring Alerts Bridge
 
 Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source. Deploys to Cloudflare Workers today; the runtime-agnostic core (Vercel, Deno Deploy, AWS Lambda, and Node/VPS adapters) is on the roadmap.
 
