@@ -74,3 +74,43 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 | `TELEGRAM_CHAT_ID` | Target chat, group, or channel ID (e.g. `-1001234567890`) |
 
 Telegram delivers alerts as plain-text messages via the [Bot API](https://core.telegram.org/bots/api#sendmessage) `sendMessage` endpoint. Messages are sent without `parse_mode`, so monitor names containing Markdown metacharacters (`_`, `*`, `[`, `]`, `` ` ``) are delivered verbatim and cannot cause API errors. Primarily intended for internal/ops use rather than end-user notification.
+
+## Deploy to Cloudflare Workers
+
+```bash
+npm install
+```
+
+Set secrets (repeat for each secret — values are never stored in `wrangler.toml`):
+
+```bash
+wrangler secret put PROVIDER                          # e.g. pushover
+wrangler secret put MONITOR_WEBHOOK_SECRETS           # from Monitive webhook settings
+wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS    # from Monitive webhook settings
+
+# Pushover
+wrangler secret put PUSHOVER_TOKEN
+wrangler secret put PUSHOVER_USER
+
+# ntfy (NTFY_URL defaults to https://ntfy.sh)
+wrangler secret put NTFY_TOPIC
+wrangler secret put NTFY_TOKEN    # optional, only for protected topics
+
+# Slack
+wrangler secret put SLACK_WEBHOOK_URL
+
+# Discord
+wrangler secret put DISCORD_WEBHOOK_URL
+
+# Telegram
+wrangler secret put TELEGRAM_BOT_TOKEN
+wrangler secret put TELEGRAM_CHAT_ID
+```
+
+Deploy:
+
+```bash
+npm run deploy
+```
+
+The resulting `*.workers.dev` URL (or your custom domain if configured) is the webhook endpoint to paste into Monitive's webhook settings.
