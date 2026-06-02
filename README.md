@@ -2,7 +2,7 @@
 
 Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source, runs on Cloudflare Workers / Vercel / Deno Deploy / AWS Lambda / VPS.
 
-**Phase 2b — Pushover and ntfy providers live; Slack/Discord/Telegram next.**
+**Phase 2c — Pushover, ntfy, and Slack providers live; Discord/Telegram next.**
 
 ## Providers
 
@@ -34,3 +34,18 @@ ntfy delivers push notifications via the ntfy.sh open-source pub/sub service. Pu
 | 5 (urgent) | `down`, `kill_switch_flipped` (active), `account_suspended` |
 | 4 (high) | `cap_hit`, `fleet_util_exceeded` |
 | 3 (default) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+
+### Slack
+
+| Variable | Description |
+|---|---|
+| `PROVIDER` | Set to `slack` (or include in a comma-separated list) |
+| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from your Slack app configuration |
+
+Slack delivers alerts as message attachments with severity colors via an [Incoming Webhook](https://api.slack.com/messaging/webhooks). Create a Slack app, enable Incoming Webhooks, and copy the webhook URL into `SLACK_WEBHOOK_URL`. Alerts are color-coded:
+
+| Color | Events |
+|---|---|
+| `danger` (red) | `down`, `kill_switch_flipped` (active), `account_suspended` |
+| `warning` (yellow) | `cap_hit`, `fleet_util_exceeded` |
+| `good` (green) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
