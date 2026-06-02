@@ -81,30 +81,30 @@ Telegram delivers alerts as plain-text messages via the [Bot API](https://core.t
 npm install
 ```
 
-Set secrets (repeat for each secret — values are never stored in `wrangler.toml`):
+Set secrets (`npx` resolves the `wrangler` devDependency installed above; repeat for each secret — values are never stored in `wrangler.toml`):
 
 ```bash
-wrangler secret put PROVIDER                          # e.g. pushover
-wrangler secret put MONITOR_WEBHOOK_SECRETS           # from Monitive webhook settings
-wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS    # from Monitive webhook settings
+npx wrangler secret put PROVIDER                          # e.g. pushover
+npx wrangler secret put MONITOR_WEBHOOK_SECRETS           # from Monitive webhook settings
+npx wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS    # from Monitive webhook settings
 
 # Pushover
-wrangler secret put PUSHOVER_TOKEN
-wrangler secret put PUSHOVER_USER
+npx wrangler secret put PUSHOVER_TOKEN
+npx wrangler secret put PUSHOVER_USER
 
 # ntfy (NTFY_URL defaults to https://ntfy.sh)
-wrangler secret put NTFY_TOPIC
-wrangler secret put NTFY_TOKEN    # optional, only for protected topics
+npx wrangler secret put NTFY_TOPIC
+npx wrangler secret put NTFY_TOKEN    # optional, only for protected topics
 
 # Slack
-wrangler secret put SLACK_WEBHOOK_URL
+npx wrangler secret put SLACK_WEBHOOK_URL
 
 # Discord
-wrangler secret put DISCORD_WEBHOOK_URL
+npx wrangler secret put DISCORD_WEBHOOK_URL
 
 # Telegram
-wrangler secret put TELEGRAM_BOT_TOKEN
-wrangler secret put TELEGRAM_CHAT_ID
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_CHAT_ID
 ```
 
 Deploy:
