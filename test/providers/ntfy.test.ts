@@ -189,6 +189,18 @@ describe("ntfy — URL + topic routing", () => {
     await ntfy.send(downPayload, { NTFY_TOPIC: "  my-alerts  " });
     expect(parseJson(fetchMock).topic).toBe("my-alerts");
   });
+
+  it("trims whitespace/newline from NTFY_URL", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts", NTFY_URL: "  https://ntfy.example.com\n" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.example.com");
+  });
+
+  it("falls back to the default URL when NTFY_URL is whitespace only", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(downPayload, { NTFY_TOPIC: "my-alerts", NTFY_URL: "   " });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ntfy.sh");
+  });
 });
 
 describe("ntfy — Authorization header", () => {

@@ -116,7 +116,7 @@ export const ntfy: Provider = {
     // CJK, CR/LF), so a header-based Title would fail to deliver for any monitor
     // name outside ASCII. The body path is encoding-safe and also avoids
     // interpolating the (untrusted) topic into the URL path.
-    const url = (env.NTFY_URL || NTFY_DEFAULT_URL).replace(/\/+$/, "");
+    const url = (env.NTFY_URL?.trim() || NTFY_DEFAULT_URL).replace(/\/+$/, "");
     const { title, message } = format(payload);
 
     const headers: Record<string, string> = {
