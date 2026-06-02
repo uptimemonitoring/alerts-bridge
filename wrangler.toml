@@ -4,29 +4,29 @@ compatibility_date = "2025-01-01"
 
 # Runtime environment variables
 #
-# All secrets must be set via `wrangler secret put <NAME>` — do NOT commit
+# All secrets must be set via `npx wrangler secret put <NAME>` — do NOT commit
 # them here. [vars] is for non-secret defaults only and may be omitted.
 #
 # Required for every deployment:
-#   wrangler secret put PROVIDER                   # e.g. "pushover" or "pushover,ntfy"
-#   wrangler secret put MONITOR_WEBHOOK_SECRETS    # comma-separated HMAC secret(s)
-#   wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS  # comma-separated HMAC secret(s)
+#   npx wrangler secret put PROVIDER                   # e.g. "pushover" or "pushover,ntfy"
+#   npx wrangler secret put MONITOR_WEBHOOK_SECRETS    # comma-separated HMAC secret(s)
+#   npx wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS  # comma-separated HMAC secret(s)
 #
 # Pushover provider:
-#   wrangler secret put PUSHOVER_TOKEN
-#   wrangler secret put PUSHOVER_USER
+#   npx wrangler secret put PUSHOVER_TOKEN
+#   npx wrangler secret put PUSHOVER_USER
 #
 # ntfy provider:
-#   wrangler secret put NTFY_TOPIC
-#   wrangler secret put NTFY_TOKEN   # optional, only for protected topics
+#   npx wrangler secret put NTFY_TOPIC
+#   npx wrangler secret put NTFY_TOKEN   # optional, only for protected topics
 #   # NTFY_URL defaults to https://ntfy.sh — override only for self-hosted
 #
 # Slack provider:
-#   wrangler secret put SLACK_WEBHOOK_URL
+#   npx wrangler secret put SLACK_WEBHOOK_URL
 #
 # Discord provider:
-#   wrangler secret put DISCORD_WEBHOOK_URL
+#   npx wrangler secret put DISCORD_WEBHOOK_URL
 #
 # Telegram provider:
-#   wrangler secret put TELEGRAM_BOT_TOKEN
-#   wrangler secret put TELEGRAM_CHAT_ID
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_CHAT_ID
