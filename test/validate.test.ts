@@ -17,8 +17,8 @@ function makeReq(
   return new Request("http://localhost/", { method, headers: h, ...(hasBody ? { body: bodyInit } : {}) });
 }
 
-const MONITOR_DOWN = '{"event":"down","monitor":{"id":1287,"name":"myapp-healthz"},"detected_at":"2026-04-12T14:23:11Z","evidence":{"primary_error":"http_5xx","status_code":503,"region":"US-E"}}';
-const MONITOR_UP   = '{"event":"up","monitor":{"id":1287,"name":"myapp-healthz"},"detected_at":"2026-04-12T14:31:02Z","evidence":{"primary_error":"","status_code":200,"region":"US-E"}}';
+const MONITOR_DOWN = '{"event":"monitor.down","monitor_id":1287,"occurred_at":"2026-04-12T14:23:11Z","reason":"http_5xx","monitor_name":"myapp-healthz"}';
+const MONITOR_UP   = '{"event":"monitor.up","monitor_id":1287,"occurred_at":"2026-04-12T14:31:02Z","monitor_name":"myapp-healthz"}';
 const KILL_SWITCH  = '{"event":"kill_switch_flipped","active":true,"sentinel_path":"/var/lib/monitive/kill","detected_at":"2026-04-12T14:23:11Z","actor":"lucianmd"}';
 
 describe("validate — method", () => {
@@ -94,9 +94,8 @@ describe("validate — body size", () => {
   });
 
   it("accepts exactly 65536 bytes when valid JSON (boundary)", () => {
-    // Build a valid monitor payload padded to exactly 65536 bytes via a long name
-    const base = '{"event":"down","monitor":{"id":1,"name":"';
-    const suffix = '"},"detected_at":"2026-01-01T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}';
+    const base = '{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T00:00:00Z","monitor_name":"';
+    const suffix = '"}';
     const padding = "x".repeat(65536 - base.length - suffix.length);
     const big = base + padding + suffix;
     expect(big.length).toBe(65536);
@@ -127,15 +126,15 @@ describe("validate — event discriminator", () => {
 });
 
 describe("validate — monitor payload validation", () => {
-  it("rejects missing monitor.name with 400", () => {
-    const body = '{"event":"down","monitor":{"id":1},"detected_at":"2026-01-01T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}';
+  it("rejects missing monitor_id with 400", () => {
+    const body = '{"event":"monitor.down","occurred_at":"2026-01-01T00:00:00Z"}';
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
-  it("rejects non-RFC3339 detected_at with 400", () => {
-    const body = '{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"yesterday","evidence":{"primary_error":"e","status_code":503,"region":"US"}}';
+  it("rejects non-RFC3339 occurred_at with 400", () => {
+    const body = '{"event":"monitor.down","monitor_id":1,"occurred_at":"yesterday"}';
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) {
@@ -144,8 +143,8 @@ describe("validate — monitor payload validation", () => {
     }
   });
 
-  it("rejects fractional monitor.id (P2 migration regression)", () => {
-    const body = '{"event":"down","monitor":{"id":1.5,"name":"x"},"detected_at":"2026-01-01T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}';
+  it("rejects fractional monitor_id (P2 migration regression)", () => {
+    const body = '{"event":"monitor.down","monitor_id":1.5,"occurred_at":"2026-01-01T00:00:00Z"}';
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
@@ -158,6 +157,18 @@ describe("validate — monitor payload validation", () => {
 
   it("accepts a valid monitor-up payload", () => {
     const r = validate(makeReq("POST", MONITOR_UP), utf8(MONITOR_UP));
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts monitor.flapping without optional fields", () => {
+    const body = '{"event":"monitor.flapping","monitor_id":30,"occurred_at":"2026-04-12T14:35:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts monitor-down with all optional fields present", () => {
+    const body = '{"event":"monitor.down","monitor_id":30,"occurred_at":"2026-04-12T14:23:11Z","monitor_name":"myapp","monitor_url":"https://example.com","reason":"http_5xx","account_id":1,"delivery_id":3,"attempt":1}';
+    const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(true);
   });
 });
@@ -266,42 +277,42 @@ describe("validate — fleet state mismatch (codex fix)", () => {
 
 describe("validate — RFC3339 strict date validation (codex fix)", () => {
   it("rejects 2026-02-29T00:00:00Z (non-leap year) with 400", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-02-29T00:00:00Z"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
   it("rejects 2025-02-29T00:00:00Z (non-leap year) with 400", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2025-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2025-02-29T00:00:00Z"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
   it("rejects T24:00:00Z (hour overflow) with 400", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T24:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T24:00:00Z"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
   it("rejects T23:60:00Z (minute overflow) with 400", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T23:60:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T23:60:00Z"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
   it("rejects +99:99 offset with 400", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2026-01-01T00:00:00+99:99","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2026-01-01T00:00:00+99:99"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.status).toBe(400);
   });
 
   it("accepts 2024-02-29T00:00:00Z (leap year) with 200", () => {
-    const body = `{"event":"down","monitor":{"id":1,"name":"x"},"detected_at":"2024-02-29T00:00:00Z","evidence":{"primary_error":"e","status_code":503,"region":"US"}}`;
+    const body = `{"event":"monitor.down","monitor_id":1,"occurred_at":"2024-02-29T00:00:00Z"}`;
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(true);
   });

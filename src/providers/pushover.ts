@@ -12,8 +12,9 @@ function truncate(s: string, max: number): string {
 
 function getPriority(payload: WebhookPayload): number {
   switch (payload.event) {
-    case "down": return 2;
-    case "up": return 0;
+    case "monitor.down": return 2;
+    case "monitor.up": return 0;
+    case "monitor.flapping": return 1;
     case "kill_switch_flipped": return payload.active ? 2 : 0;
     case "account_suspended": return 2;
     case "cap_hit": return 1;
@@ -28,16 +29,27 @@ function getPriority(payload: WebhookPayload): number {
 
 function format(payload: WebhookPayload): { title: string; message: string } {
   switch (payload.event) {
-    case "down":
-      return {
-        title: `[DOWN] ${payload.monitor.name}`,
-        message: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is DOWN.\nError: ${payload.evidence.primary_error} | Status: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
-    case "up":
-      return {
-        title: `[UP] ${payload.monitor.name}`,
-        message: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is UP.\nStatus: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
+    case "monitor.down": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is DOWN`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      return { title: `[DOWN] ${name}`, message };
+    }
+    case "monitor.up": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is UP`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      return { title: `[UP] ${name}`, message };
+    }
+    case "monitor.flapping": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let message = `${name} is FLAPPING`;
+      if (payload.reason) message += ` — ${payload.reason}`;
+      if (payload.monitor_url) message += `\n${payload.monitor_url}`;
+      return { title: `[FLAPPING] ${name}`, message };
+    }
     case "kill_switch_flipped": {
       const state = payload.active ? "ACTIVATED" : "DEACTIVATED";
       const titleWord = payload.active ? "Activated" : "Deactivated";

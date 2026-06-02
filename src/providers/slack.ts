@@ -11,8 +11,9 @@ function truncate(s: string, max: number): string {
 
 function getColor(payload: WebhookPayload): string {
   switch (payload.event) {
-    case "down": return "danger";
-    case "up": return "good";
+    case "monitor.down": return "danger";
+    case "monitor.up": return "good";
+    case "monitor.flapping": return "warning";
     case "kill_switch_flipped": return payload.active ? "danger" : "good";
     case "account_suspended": return "danger";
     case "cap_hit": return "warning";
@@ -27,16 +28,27 @@ function getColor(payload: WebhookPayload): string {
 
 function format(payload: WebhookPayload): { title: string; text: string } {
   switch (payload.event) {
-    case "down":
-      return {
-        title: `[DOWN] ${payload.monitor.name}`,
-        text: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is DOWN.\nError: ${payload.evidence.primary_error} | Status: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
-    case "up":
-      return {
-        title: `[UP] ${payload.monitor.name}`,
-        text: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is UP.\nStatus: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
+    case "monitor.down": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let text = `${name} is DOWN`;
+      if (payload.reason) text += ` — ${payload.reason}`;
+      if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      return { title: `[DOWN] ${name}`, text };
+    }
+    case "monitor.up": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let text = `${name} is UP`;
+      if (payload.reason) text += ` — ${payload.reason}`;
+      if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      return { title: `[UP] ${name}`, text };
+    }
+    case "monitor.flapping": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let text = `${name} is FLAPPING`;
+      if (payload.reason) text += ` — ${payload.reason}`;
+      if (payload.monitor_url) text += `\n${payload.monitor_url}`;
+      return { title: `[FLAPPING] ${name}`, text };
+    }
     case "kill_switch_flipped": {
       const state = payload.active ? "ACTIVATED" : "DEACTIVATED";
       const titleWord = payload.active ? "Activated" : "Deactivated";

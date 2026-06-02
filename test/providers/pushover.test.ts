@@ -9,17 +9,25 @@ const BASE_ENV: Env = {
 
 // Payloads for each event variant
 const downPayload: WebhookPayload = {
-  event: "down",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:23:11Z",
-  evidence: { primary_error: "http_5xx", status_code: 503, region: "US-E" },
+  event: "monitor.down",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:23:11Z",
+  reason: "http_5xx",
 };
 
 const upPayload: WebhookPayload = {
-  event: "up",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:31:02Z",
-  evidence: { primary_error: "", status_code: 200, region: "US-E" },
+  event: "monitor.up",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:31:02Z",
+};
+
+const flappingPayload: WebhookPayload = {
+  event: "monitor.flapping",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:35:00Z",
 };
 
 const killSwitchActivePayload: WebhookPayload = {
@@ -121,8 +129,9 @@ describe("pushover — validateEnv", () => {
 
 describe("pushover — priority mapping", () => {
   it.each([
-    ["down", downPayload, 2],
-    ["up", upPayload, 0],
+    ["monitor.down", downPayload, 2],
+    ["monitor.up", upPayload, 0],
+    ["monitor.flapping", flappingPayload, 1],
     ["kill_switch_flipped active=true", killSwitchActivePayload, 2],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 0],
     ["account_suspended", accountSuspendedPayload, 2],
@@ -205,7 +214,7 @@ describe("pushover — outbound shape", () => {
 
   it("truncates title over 250 chars", async () => {
     const longName = "a".repeat(300);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
     await pushover.send(payload, BASE_ENV);
     const body = parseBody(fetchMock);
@@ -213,11 +222,8 @@ describe("pushover — outbound shape", () => {
   });
 
   it("truncates message over 1024 chars", async () => {
-    const longError = "e".repeat(2000);
-    const payload: WebhookPayload = {
-      ...downPayload,
-      evidence: { ...downPayload.evidence, primary_error: longError },
-    };
+    const longReason = "e".repeat(2000);
+    const payload: WebhookPayload = { ...downPayload, reason: longReason };
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
     await pushover.send(payload, BASE_ENV);
     const body = parseBody(fetchMock);
@@ -227,8 +233,9 @@ describe("pushover — outbound shape", () => {
 
 describe("pushover — title formats", () => {
   it.each([
-    ["down", downPayload, "[DOWN] myapp-healthz"],
-    ["up", upPayload, "[UP] myapp-healthz"],
+    ["monitor.down", downPayload, "[DOWN] myapp-healthz"],
+    ["monitor.up", upPayload, "[UP] myapp-healthz"],
+    ["monitor.flapping", flappingPayload, "[FLAPPING] myapp-healthz"],
     ["kill_switch_flipped active=true", killSwitchActivePayload, "Kill Switch Activated"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "Kill Switch Deactivated"],
     ["account_suspended", accountSuspendedPayload, "Account Suspended"],
@@ -290,7 +297,7 @@ describe("pushover — Unicode-safe truncation", () => {
     // string-slice implementation WOULD emit a lone surrogate here; the code-point
     // implementation must not. This parity is what makes the test catch the bug.
     const longEmojiName = "x" + "🔥".repeat(260);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longEmojiName };
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
     await pushover.send(payload, BASE_ENV);
     const body = parseBody(fetchMock);
@@ -302,6 +309,53 @@ describe("pushover — Unicode-safe truncation", () => {
     expect(noLoneSurrogate).toBe(true);
     // Code-point cap: TITLE_MAX-1 retained code points + the "…" ellipsis = exactly 250.
     expect(Array.from(title).length).toBe(250);
+  });
+});
+
+describe("pushover — monitor name and reason", () => {
+  it("name absent → title uses Monitor #id", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["title"]).toBe("[DOWN] Monitor #1287");
+  });
+
+  it("name absent → message contains 'Monitor #id is DOWN'", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("Monitor #1287 is DOWN");
+  });
+
+  it("name present → title uses monitor_name", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(downPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["title"]).toBe("[DOWN] myapp-healthz");
+  });
+
+  it("reason present → message contains reason", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(downPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("http_5xx");
+  });
+
+  it("reason absent → message does not contain ' — '", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).not.toContain(" — ");
+  });
+
+  it("flapping handled by all providers — pushover sends", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    const result = await pushover.send(flappingPayload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalled();
   });
 });
 

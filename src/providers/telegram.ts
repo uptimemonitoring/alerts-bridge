@@ -10,16 +10,27 @@ function truncate(s: string, max: number): string {
 
 function format(payload: WebhookPayload): { title: string; body: string } {
   switch (payload.event) {
-    case "down":
-      return {
-        title: `[DOWN] ${payload.monitor.name}`,
-        body: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is DOWN.\nError: ${payload.evidence.primary_error} | Status: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
-    case "up":
-      return {
-        title: `[UP] ${payload.monitor.name}`,
-        body: `Monitor #${payload.monitor.id} (${payload.monitor.name}) is UP.\nStatus: ${payload.evidence.status_code} | Region: ${payload.evidence.region} | Detected: ${payload.detected_at}`,
-      };
+    case "monitor.down": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let body = `${name} is DOWN`;
+      if (payload.reason) body += ` — ${payload.reason}`;
+      if (payload.monitor_url) body += `\n${payload.monitor_url}`;
+      return { title: `[DOWN] ${name}`, body };
+    }
+    case "monitor.up": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let body = `${name} is UP`;
+      if (payload.reason) body += ` — ${payload.reason}`;
+      if (payload.monitor_url) body += `\n${payload.monitor_url}`;
+      return { title: `[UP] ${name}`, body };
+    }
+    case "monitor.flapping": {
+      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      let body = `${name} is FLAPPING`;
+      if (payload.reason) body += ` — ${payload.reason}`;
+      if (payload.monitor_url) body += `\n${payload.monitor_url}`;
+      return { title: `[FLAPPING] ${name}`, body };
+    }
     case "kill_switch_flipped": {
       const state = payload.active ? "ACTIVATED" : "DEACTIVATED";
       const titleWord = payload.active ? "Activated" : "Deactivated";

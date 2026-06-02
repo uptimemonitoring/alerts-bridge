@@ -1,1 +1,1 @@
-{"event":"down","monitor":{"id":1287,"name":"myapp-healthz"},"detected_at":"2026-04-12T14:23:11Z","evidence":{"primary_error":"http_5xx","status_code":503,"region":"US-E"}}
+{"event":"monitor.down","monitor_id":1287,"occurred_at":"2026-04-12T14:23:11Z","reason":"http_5xx","monitor_name":"myapp-healthz"}

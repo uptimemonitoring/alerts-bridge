@@ -7,17 +7,25 @@ const BASE_ENV: Env = {
 };
 
 const downPayload: WebhookPayload = {
-  event: "down",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:23:11Z",
-  evidence: { primary_error: "http_5xx", status_code: 503, region: "US-E" },
+  event: "monitor.down",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:23:11Z",
+  reason: "http_5xx",
 };
 
 const upPayload: WebhookPayload = {
-  event: "up",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:31:02Z",
-  evidence: { primary_error: "", status_code: 200, region: "US-E" },
+  event: "monitor.up",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:31:02Z",
+};
+
+const flappingPayload: WebhookPayload = {
+  event: "monitor.flapping",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:35:00Z",
 };
 
 const killSwitchActivePayload: WebhookPayload = {
@@ -112,8 +120,9 @@ describe("slack — validateEnv", () => {
 
 describe("slack — color mapping", () => {
   it.each([
-    ["down", downPayload, "danger"],
-    ["up", upPayload, "good"],
+    ["monitor.down", downPayload, "danger"],
+    ["monitor.up", upPayload, "good"],
+    ["monitor.flapping", flappingPayload, "warning"],
     ["kill_switch_flipped active=true", killSwitchActivePayload, "danger"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "good"],
     ["account_suspended", accountSuspendedPayload, "danger"],
@@ -129,8 +138,9 @@ describe("slack — color mapping", () => {
 
 describe("slack — title and text non-empty", () => {
   it.each([
-    ["down", downPayload],
-    ["up", upPayload],
+    ["monitor.down", downPayload],
+    ["monitor.up", upPayload],
+    ["monitor.flapping", flappingPayload],
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
@@ -214,10 +224,50 @@ describe("slack — success and error paths", () => {
   });
 });
 
+describe("slack — monitor name and reason", () => {
+  it("name absent → title uses Monitor #id", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await slack.send(payload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.title).toBe("[DOWN] Monitor #1287");
+  });
+
+  it("name absent → text contains 'Monitor #id is DOWN'", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await slack.send(payload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.text).toContain("Monitor #1287 is DOWN");
+  });
+
+  it("reason present → text contains reason", async () => {
+    const fetchMock = mockFetch(200);
+    await slack.send(downPayload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.text).toContain("http_5xx");
+  });
+
+  it("reason absent → text does not contain ' — '", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await slack.send(payload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.text).not.toContain(" — ");
+  });
+
+  it("flapping handled — slack sends", async () => {
+    const fetchMock = mockFetch(200);
+    const result = await slack.send(flappingPayload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+});
+
 describe("slack — truncation", () => {
   it("truncates title over 250 code points", async () => {
     const longName = "a".repeat(300);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await slack.send(payload, BASE_ENV);
     const att = parseJson(fetchMock).attachments?.[0];
@@ -226,7 +276,7 @@ describe("slack — truncation", () => {
 
   it("truncates text over 3000 code points", async () => {
     const longName = "a".repeat(5000);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await slack.send(payload, BASE_ENV);
     const att = parseJson(fetchMock).attachments?.[0];
@@ -237,7 +287,7 @@ describe("slack — truncation", () => {
     // Each emoji is one astral code point = 2 UTF-16 code units. "[DOWN] " is 7 units + "x" = 8.
     // Naive string slicing at a UTF-16 offset can split a surrogate pair and emit a lone surrogate.
     const longEmojiName = "x" + "🔥".repeat(260);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longEmojiName };
     const fetchMock = mockFetch(200);
     await slack.send(payload, BASE_ENV);
     const title = parseJson(fetchMock).attachments?.[0]?.title!;

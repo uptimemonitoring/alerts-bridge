@@ -1,4 +1,4 @@
-import type { WebhookPayload } from "./types.js";
+import type { WebhookPayload, MonitorEvent } from "./types.js";
 import { isMonitorEvent, isSecurityEvent } from "./types.js";
 
 export type ValidationResult =
@@ -76,48 +76,55 @@ function requireBoolean(obj: Record<string, unknown>, key: string): boolean | nu
 }
 
 function validateMonitorPayload(
-  event: "down" | "up",
+  event: MonitorEvent,
   body: Record<string, unknown>,
 ): ValidationResult {
-  const monitorRaw = body["monitor"];
-  if (!isObject(monitorRaw)) {
-    return { ok: false, status: 400, message: "missing or invalid monitor object" };
-  }
-  const id = requireSafeInt(monitorRaw, "id");
-  if (id === null) return { ok: false, status: 400, message: "monitor.id must be a positive integer" };
-  const name = requireString(monitorRaw, "name");
-  if (name === null) return { ok: false, status: 400, message: "monitor.name must be a string" };
-
-  if (!validTimestamp(body["detected_at"])) {
-    return { ok: false, status: 400, message: "detected_at must be an RFC3339 timestamp" };
+  const monitor_id = requireSafeInt(body, "monitor_id");
+  if (monitor_id === null) {
+    return { ok: false, status: 400, message: "monitor_id must be a positive integer" };
   }
 
-  const evidenceRaw = body["evidence"];
-  if (!isObject(evidenceRaw)) {
-    return { ok: false, status: 400, message: "missing or invalid evidence object" };
+  if (!validTimestamp(body["occurred_at"])) {
+    return { ok: false, status: 400, message: "occurred_at must be an RFC3339 timestamp" };
   }
-  if (requireString(evidenceRaw, "primary_error") === null) {
-    return { ok: false, status: 400, message: "evidence.primary_error must be a string" };
-  }
-  const statusCode = evidenceRaw["status_code"];
-  if (!Number.isSafeInteger(statusCode) || (statusCode as number) < 0) {
-    return { ok: false, status: 400, message: "evidence.status_code must be a non-negative integer" };
-  }
-  if (requireString(evidenceRaw, "region") === null) {
-    return { ok: false, status: 400, message: "evidence.region must be a string" };
-  }
+
+  const optStr = (key: string): string | undefined | null => {
+    const v = body[key];
+    if (v === undefined) return undefined;
+    return typeof v === "string" ? v : null;
+  };
+  const optInt = (key: string): number | undefined | null => {
+    const v = body[key];
+    if (v === undefined) return undefined;
+    if (!Number.isSafeInteger(v) || (v as number) < 0) return null;
+    return v as number;
+  };
+
+  const monitor_name = optStr("monitor_name");
+  if (monitor_name === null) return { ok: false, status: 400, message: "monitor_name must be a string if present" };
+  const monitor_url = optStr("monitor_url");
+  if (monitor_url === null) return { ok: false, status: 400, message: "monitor_url must be a string if present" };
+  const reason = optStr("reason");
+  if (reason === null) return { ok: false, status: 400, message: "reason must be a string if present" };
+  const account_id = optInt("account_id");
+  if (account_id === null) return { ok: false, status: 400, message: "account_id must be a non-negative integer if present" };
+  const delivery_id = optInt("delivery_id");
+  if (delivery_id === null) return { ok: false, status: 400, message: "delivery_id must be a non-negative integer if present" };
+  const attempt = optInt("attempt");
+  if (attempt === null) return { ok: false, status: 400, message: "attempt must be a non-negative integer if present" };
 
   return {
     ok: true,
     payload: {
       event,
-      monitor: { id, name },
-      detected_at: body["detected_at"] as string,
-      evidence: {
-        primary_error: evidenceRaw["primary_error"] as string,
-        status_code: statusCode as number,
-        region: evidenceRaw["region"] as string,
-      },
+      monitor_id,
+      occurred_at: body["occurred_at"] as string,
+      ...(monitor_name !== undefined ? { monitor_name } : {}),
+      ...(monitor_url !== undefined ? { monitor_url } : {}),
+      ...(reason !== undefined ? { reason } : {}),
+      ...(account_id !== undefined ? { account_id } : {}),
+      ...(delivery_id !== undefined ? { delivery_id } : {}),
+      ...(attempt !== undefined ? { attempt } : {}),
     },
   };
 }

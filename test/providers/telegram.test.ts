@@ -8,17 +8,25 @@ const BASE_ENV: Env = {
 };
 
 const downPayload: WebhookPayload = {
-  event: "down",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:23:11Z",
-  evidence: { primary_error: "http_5xx", status_code: 503, region: "US-E" },
+  event: "monitor.down",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:23:11Z",
+  reason: "http_5xx",
 };
 
 const upPayload: WebhookPayload = {
-  event: "up",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:31:02Z",
-  evidence: { primary_error: "", status_code: 200, region: "US-E" },
+  event: "monitor.up",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:31:02Z",
+};
+
+const flappingPayload: WebhookPayload = {
+  event: "monitor.flapping",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:35:00Z",
 };
 
 const killSwitchActivePayload: WebhookPayload = {
@@ -123,8 +131,9 @@ describe("telegram — validateEnv", () => {
 
 describe("telegram — text non-empty and chat_id correct for all events", () => {
   it.each([
-    ["down", downPayload],
-    ["up", upPayload],
+    ["monitor.down", downPayload],
+    ["monitor.up", upPayload],
+    ["monitor.flapping", flappingPayload],
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
@@ -153,7 +162,7 @@ describe("telegram — no parse_mode field", () => {
 describe("telegram — Markdown metacharacters delivered verbatim", () => {
   it("monitor name with _ * [ ] ` metacharacters is not escaped", async () => {
     const name = "my_app *[test]* `code`";
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: name };
     const fetchMock = mockFetch(200, '{"ok":true}');
     await telegram.send(payload, BASE_ENV);
     const json = parseJson(fetchMock);
@@ -220,10 +229,45 @@ describe("telegram — success and error paths", () => {
   });
 });
 
+describe("telegram — monitor name and reason", () => {
+  it("name absent → text contains 'Monitor #id is DOWN'", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).text).toContain("Monitor #1287 is DOWN");
+  });
+
+  it("name present → text contains monitor_name", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(downPayload, BASE_ENV);
+    expect(parseJson(fetchMock).text).toContain("myapp-healthz");
+  });
+
+  it("reason present → text contains reason", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(downPayload, BASE_ENV);
+    expect(parseJson(fetchMock).text).toContain("http_5xx");
+  });
+
+  it("reason absent → text does not contain ' — '", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).text).not.toContain(" — ");
+  });
+
+  it("flapping handled — telegram sends", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    const result = await telegram.send(flappingPayload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+});
+
 describe("telegram — truncation", () => {
   it("truncates text over 4096 code points", async () => {
     const longName = "a".repeat(5000);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200, '{"ok":true}');
     await telegram.send(payload, BASE_ENV);
     const json = parseJson(fetchMock);
@@ -232,7 +276,7 @@ describe("telegram — truncation", () => {
 
   it("does not emit lone surrogates when monitor name contains astral code points", async () => {
     const longEmojiName = "x" + "🔥".repeat(4100);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longEmojiName };
     const fetchMock = mockFetch(200, '{"ok":true}');
     await telegram.send(payload, BASE_ENV);
     const text = parseJson(fetchMock).text!;

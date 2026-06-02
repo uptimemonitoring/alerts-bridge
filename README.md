@@ -31,9 +31,9 @@ ntfy delivers push notifications via the ntfy.sh open-source pub/sub service. Pu
 
 | Priority | Events |
 |---|---|
-| 5 (urgent) | `down`, `kill_switch_flipped` (active), `account_suspended` |
-| 4 (high) | `cap_hit`, `fleet_util_exceeded` |
-| 3 (default) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+| 5 (urgent) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| 4 (high) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
+| 3 (default) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
 ### Slack
 
@@ -46,9 +46,9 @@ Slack delivers alerts as message attachments with severity colors via an [Incomi
 
 | Color | Events |
 |---|---|
-| `danger` (red) | `down`, `kill_switch_flipped` (active), `account_suspended` |
-| `warning` (yellow) | `cap_hit`, `fleet_util_exceeded` |
-| `good` (green) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+| `danger` (red) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| `warning` (yellow) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
+| `good` (green) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
 ### Discord
 
@@ -61,9 +61,9 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 
 | Color | Events |
 |---|---|
-| Red (`#E01E5A`) | `down`, `kill_switch_flipped` (active), `account_suspended` |
-| Amber (`#F2C744`) | `cap_hit`, `fleet_util_exceeded` |
-| Green (`#2EB67D`) | `up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
+| Red (`#E01E5A`) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| Amber (`#F2C744`) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
+| Green (`#2EB67D`) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
 ### Telegram *(internal-mainly)*
 

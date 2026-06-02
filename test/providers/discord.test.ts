@@ -7,17 +7,25 @@ const BASE_ENV: Env = {
 };
 
 const downPayload: WebhookPayload = {
-  event: "down",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:23:11Z",
-  evidence: { primary_error: "http_5xx", status_code: 503, region: "US-E" },
+  event: "monitor.down",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:23:11Z",
+  reason: "http_5xx",
 };
 
 const upPayload: WebhookPayload = {
-  event: "up",
-  monitor: { id: 1287, name: "myapp-healthz" },
-  detected_at: "2026-04-12T14:31:02Z",
-  evidence: { primary_error: "", status_code: 200, region: "US-E" },
+  event: "monitor.up",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:31:02Z",
+};
+
+const flappingPayload: WebhookPayload = {
+  event: "monitor.flapping",
+  monitor_id: 1287,
+  monitor_name: "myapp-healthz",
+  occurred_at: "2026-04-12T14:35:00Z",
 };
 
 const killSwitchActivePayload: WebhookPayload = {
@@ -112,8 +120,9 @@ describe("discord — validateEnv", () => {
 
 describe("discord — color mapping", () => {
   it.each([
-    ["down", downPayload, 0xE01E5A],
-    ["up", upPayload, 0x2EB67D],
+    ["monitor.down", downPayload, 0xE01E5A],
+    ["monitor.up", upPayload, 0x2EB67D],
+    ["monitor.flapping", flappingPayload, 0xF2C744],
     ["kill_switch_flipped active=true", killSwitchActivePayload, 0xE01E5A],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 0x2EB67D],
     ["account_suspended", accountSuspendedPayload, 0xE01E5A],
@@ -129,8 +138,9 @@ describe("discord — color mapping", () => {
 
 describe("discord — title and description non-empty", () => {
   it.each([
-    ["down", downPayload],
-    ["up", upPayload],
+    ["monitor.down", downPayload],
+    ["monitor.up", upPayload],
+    ["monitor.flapping", flappingPayload],
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
@@ -206,10 +216,50 @@ describe("discord — success and error paths", () => {
   });
 });
 
+describe("discord — monitor name and reason", () => {
+  it("name absent → title uses Monitor #id", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await discord.send(payload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.title).toBe("[DOWN] Monitor #1287");
+  });
+
+  it("name absent → description contains 'Monitor #id is DOWN'", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await discord.send(payload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.description).toContain("Monitor #1287 is DOWN");
+  });
+
+  it("reason present → description contains reason", async () => {
+    const fetchMock = mockFetch(200);
+    await discord.send(downPayload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.description).toContain("http_5xx");
+  });
+
+  it("reason absent → description does not contain ' — '", async () => {
+    const payload: WebhookPayload = { event: "monitor.down", monitor_id: 1287, occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    await discord.send(payload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.description).not.toContain(" — ");
+  });
+
+  it("flapping handled — discord sends", async () => {
+    const fetchMock = mockFetch(200);
+    const result = await discord.send(flappingPayload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+});
+
 describe("discord — truncation", () => {
   it("truncates title over 256 code points", async () => {
     const longName = "a".repeat(300);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await discord.send(payload, BASE_ENV);
     const embed = parseJson(fetchMock).embeds?.[0];
@@ -218,7 +268,7 @@ describe("discord — truncation", () => {
 
   it("truncates description over 4096 code points", async () => {
     const longName = "a".repeat(5000);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longName };
     const fetchMock = mockFetch(200);
     await discord.send(payload, BASE_ENV);
     const embed = parseJson(fetchMock).embeds?.[0];
@@ -229,7 +279,7 @@ describe("discord — truncation", () => {
     // Each emoji is one astral code point = 2 UTF-16 code units. "[DOWN] " is 7 units + "x" = 8.
     // Naive string slicing at a UTF-16 offset can split a surrogate pair and emit a lone surrogate.
     const longEmojiName = "x" + "🔥".repeat(260);
-    const payload: WebhookPayload = { ...downPayload, monitor: { id: 1, name: longEmojiName } };
+    const payload: WebhookPayload = { ...downPayload, monitor_name: longEmojiName };
     const fetchMock = mockFetch(200);
     await discord.send(payload, BASE_ENV);
     const title = parseJson(fetchMock).embeds?.[0]?.title!;
