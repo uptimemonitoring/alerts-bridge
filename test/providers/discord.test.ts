@@ -31,15 +31,15 @@ const flappingPayload: WebhookPayload = {
 const killSwitchActivePayload: WebhookPayload = {
   event: "kill_switch_flipped",
   active: true,
-  sentinel_path: "/var/lib/monitive/kill",
+  sentinel_path: "/var/lib/example/kill",
   detected_at: "2026-04-12T14:23:11Z",
-  actor: "lucianmd",
+  actor: "admin",
 };
 
 const killSwitchInactivePayload: WebhookPayload = {
   event: "kill_switch_flipped",
   active: false,
-  sentinel_path: "/var/lib/monitive/kill",
+  sentinel_path: "/var/lib/example/kill",
   detected_at: "2026-04-12T14:25:00Z",
 };
 

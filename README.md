@@ -1,8 +1,8 @@
 # alerts-bridge
 
-Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source, runs on Cloudflare Workers / Vercel / Deno Deploy / AWS Lambda / VPS.
+Webhook bridge that accepts Monitive deliveries and dispatches to a notification provider (Pushover, ntfy.sh, Slack, Discord, Telegram). MIT-licensed, open-source. Deploys to Cloudflare Workers today; the runtime-agnostic core (Vercel, Deno Deploy, AWS Lambda, and Node/VPS adapters) is on the roadmap.
 
-**Phase 2e — Pushover, ntfy, Slack, Discord, and Telegram providers live.**
+All five providers — Pushover, ntfy, Slack, Discord, and Telegram — are live.
 
 ## Providers
 
@@ -65,7 +65,7 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 | Amber (`#F2C744`) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
 | Green (`#2EB67D`) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
-### Telegram *(internal-mainly)*
+### Telegram
 
 | Variable | Description |
 |---|---|
@@ -73,7 +73,7 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 | `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | Target chat, group, or channel ID (e.g. `-1001234567890`) |
 
-Telegram delivers alerts as plain-text messages via the [Bot API](https://core.telegram.org/bots/api#sendmessage) `sendMessage` endpoint. Messages are sent without `parse_mode`, so monitor names containing Markdown metacharacters (`_`, `*`, `[`, `]`, `` ` ``) are delivered verbatim and cannot cause API errors. Primarily intended for internal/ops use rather than end-user notification.
+Telegram delivers alerts as plain-text messages via the [Bot API](https://core.telegram.org/bots/api#sendmessage) `sendMessage` endpoint. Messages are sent without `parse_mode`, so monitor names containing Markdown metacharacters (`_`, `*`, `[`, `]`, `` ` ``) are delivered verbatim and cannot cause API errors.
 
 ## Deploy to Cloudflare Workers
 
