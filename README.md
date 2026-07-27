@@ -15,8 +15,9 @@ Providers are plugins that implement the `Provider` contract. Multiple providers
 | `PROVIDER` | Set to `pushover` (or include in a comma-separated list) |
 | `PUSHOVER_TOKEN` | Pushover application API token |
 | `PUSHOVER_USER` | Pushover user or group key |
+| `PUSHOVER_DOWN_PRIORITY` | Optional. Pushover priority for `monitor.down` alerts, one of `-2,-1,0,1,2`. Defaults to `2` (emergency). Set `0` for a normal, non-waking notification. |
 
-Pushover delivers push notifications to iOS, Android, and desktop. Down alerts and security emergencies use Pushover's emergency priority — the message retries every 30 seconds (up to Pushover's 50-retry / ~25-minute cap) and requires acknowledgment, bypassing Do Not Disturb. Pushover is a one-time purchase of $4.99 per platform (iOS/Android/Desktop client app); the API is free.
+Pushover delivers push notifications to iOS, Android, and desktop. By default, down alerts and security emergencies use Pushover's emergency priority: the message retries every 30 seconds (up to Pushover's 50-retry / ~25-minute cap) and requires acknowledgment, bypassing Do Not Disturb. If you would rather not be woken for a down alert, set `PUSHOVER_DOWN_PRIORITY=0` (or `1` for high-without-retry); security emergencies stay at emergency priority regardless. Pushover is a one-time purchase of $4.99 per platform (iOS/Android/Desktop client app); the API is free.
 
 ### ntfy
 
@@ -91,6 +92,7 @@ npx wrangler secret put SECURITY_ALERT_WEBHOOK_SECRETS    # from Monitive webhoo
 # Pushover
 npx wrangler secret put PUSHOVER_TOKEN
 npx wrangler secret put PUSHOVER_USER
+npx wrangler secret put PUSHOVER_DOWN_PRIORITY   # optional: -2..2 for monitor.down (default 2); set 0 to avoid waking
 
 # ntfy (NTFY_URL defaults to https://ntfy.sh)
 npx wrangler secret put NTFY_TOPIC

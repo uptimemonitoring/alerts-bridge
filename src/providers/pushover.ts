@@ -10,9 +10,26 @@ function truncate(s: string, max: number): string {
   return cp.slice(0, max - 1).join("") + "…";
 }
 
-function getPriority(payload: WebhookPayload): number {
+const VALID_PRIORITIES = new Set([-2, -1, 0, 1, 2]);
+
+// monitor.down priority is operator-configurable via PUSHOVER_DOWN_PRIORITY so a
+// self-hoster who does not want to be woken can drop it below emergency. Defaults
+// to 2 (emergency) to preserve prior behaviour; an unset/blank/invalid value also
+// falls back to 2 rather than silently downgrading a down alert.
+function downPriority(env: Env): number {
+  const raw = env.PUSHOVER_DOWN_PRIORITY?.trim();
+  if (!raw) return 2;
+  const n = Number(raw);
+  if (Number.isInteger(n) && VALID_PRIORITIES.has(n)) return n;
+  console.warn(
+    `alerts-bridge: invalid PUSHOVER_DOWN_PRIORITY '${raw}', falling back to 2 (emergency). Valid: -2,-1,0,1,2.`,
+  );
+  return 2;
+}
+
+function getPriority(payload: WebhookPayload, env: Env): number {
   switch (payload.event) {
-    case "monitor.down": return 2;
+    case "monitor.down": return downPriority(env);
     case "monitor.up": return 0;
     case "monitor.flapping": return 1;
     case "kill_switch_flipped": return payload.active ? 2 : 0;
@@ -114,7 +131,7 @@ export const pushover: Provider = {
 
   async send(payload: WebhookPayload, env: Env): Promise<{ ok: true } | { ok: false; reason: string }> {
     const { token, user } = getCredentials(env);
-    const priority = getPriority(payload);
+    const priority = getPriority(payload, env);
     const { title, message } = format(payload);
 
     const params = new URLSearchParams({

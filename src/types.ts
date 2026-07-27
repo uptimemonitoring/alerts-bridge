@@ -94,6 +94,10 @@ export interface Env {
   PROVIDER?: string;
   PUSHOVER_TOKEN?: string;
   PUSHOVER_USER?: string;
+  // Pushover priority for monitor.down alerts. One of -2,-1,0,1,2.
+  // Defaults to 2 (emergency: retry+expire, bypasses quiet hours) when unset
+  // or invalid. Set to 0 for a normal, non-waking notification.
+  PUSHOVER_DOWN_PRIORITY?: string;
   NTFY_URL?: string;
   NTFY_TOPIC?: string;
   NTFY_TOKEN?: string;
