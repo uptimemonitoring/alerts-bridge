@@ -15,6 +15,7 @@ compatibility_date = "2025-01-01"
 # Pushover provider:
 #   npx wrangler secret put PUSHOVER_TOKEN
 #   npx wrangler secret put PUSHOVER_USER
+#   npx wrangler secret put PUSHOVER_DOWN_PRIORITY  # optional: -2..2 for monitor.down (default 2 = emergency); set 0 for non-waking
 #
 # ntfy provider:
 #   npx wrangler secret put NTFY_TOPIC

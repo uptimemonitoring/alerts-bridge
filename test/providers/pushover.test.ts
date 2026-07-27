@@ -146,6 +146,49 @@ describe("pushover — priority mapping", () => {
   });
 });
 
+describe("pushover — configurable monitor.down priority", () => {
+  it.each([
+    ["0", "0"],
+    ["1", "1"],
+    ["-1", "-1"],
+    ["-2", "-2"],
+    ["2", "2"],
+  ] as const)("PUSHOVER_DOWN_PRIORITY=%s → down alert uses priority %s", async (raw, expected) => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(downPayload, { ...BASE_ENV, PUSHOVER_DOWN_PRIORITY: raw });
+    expect(parseBody(fetchMock)["priority"]).toBe(expected);
+  });
+
+  it("non-emergency down priority (0) omits retry/expire", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(downPayload, { ...BASE_ENV, PUSHOVER_DOWN_PRIORITY: "0" });
+    const body = parseBody(fetchMock);
+    expect(body["retry"]).toBeUndefined();
+    expect(body["expire"]).toBeUndefined();
+  });
+
+  it.each([
+    ["blank", ""],
+    ["whitespace", "   "],
+    ["non-numeric", "loud"],
+    ["out-of-range", "3"],
+    ["float", "1.5"],
+  ] as const)("invalid value (%s) falls back to emergency priority 2 with retry/expire", async (_label, raw) => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(downPayload, { ...BASE_ENV, PUSHOVER_DOWN_PRIORITY: raw });
+    const body = parseBody(fetchMock);
+    expect(body["priority"]).toBe("2");
+    expect(body["retry"]).toBe("30");
+    expect(body["expire"]).toBe("1800");
+  });
+
+  it("does not affect non-down events (up stays 0)", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(upPayload, { ...BASE_ENV, PUSHOVER_DOWN_PRIORITY: "2" });
+    expect(parseBody(fetchMock)["priority"]).toBe("0");
+  });
+});
+
 describe("pushover — retry/expire", () => {
   it("includes retry and expire for priority 2 (down)", async () => {
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
