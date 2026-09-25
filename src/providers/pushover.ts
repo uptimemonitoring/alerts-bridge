@@ -34,6 +34,7 @@ function getPriority(payload: WebhookPayload, env: Env): number {
     case "monitor.flapping": return 1;
     case "kill_switch_flipped": return payload.active ? 2 : 0;
     case "account_suspended": return 2;
+    case "account_suspension_failed": return 2;
     case "cap_hit": return 1;
     case "fleet_util_exceeded": return 1;
     case "fleet_util_recovered": return 0;
@@ -84,6 +85,13 @@ function format(payload: WebhookPayload): { title: string; message: string } {
       return {
         title: "Account Suspended",
         message: `Account #${payload.account_id} suspended${monitorSeg}.\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
+      };
+    }
+    case "account_suspension_failed": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
+      return {
+        title: "Account Suspension Failed",
+        message: `Account #${payload.account_id} suspension FAILED${monitorSeg}. Account remains ACTIVE.\nReason: ${payload.reason} | Detail: ${payload.detail} | Error: ${payload.error} | Detected: ${payload.detected_at}`,
       };
     }
     case "cap_hit": {

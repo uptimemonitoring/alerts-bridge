@@ -52,6 +52,16 @@ const accountSuspendedPayload: WebhookPayload = {
   detected_at: "2026-04-12T14:23:11Z",
 };
 
+const accountSuspensionFailedPayload: WebhookPayload = {
+  event: "account_suspension_failed",
+  account_id: 42,
+  monitor_id: 0,
+  reason: "dns_rebinding",
+  detail: "Confirmed DNS-rebinding detection",
+  error: "suspension rollback: db timeout",
+  detected_at: "2026-04-12T14:23:11Z",
+};
+
 const capHitPayload: WebhookPayload = {
   event: "cap_hit",
   account_id: 42,
@@ -126,6 +136,7 @@ describe("discord — color mapping", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, 0xE01E5A],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 0x2EB67D],
     ["account_suspended", accountSuspendedPayload, 0xE01E5A],
+    ["account_suspension_failed", accountSuspensionFailedPayload, 0xE01E5A],
     ["cap_hit", capHitPayload, 0xF2C744],
     ["fleet_util_exceeded", fleetUtilExceededPayload, 0xF2C744],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, 0x2EB67D],
@@ -144,6 +155,7 @@ describe("discord — title and description non-empty", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
+    ["account_suspension_failed", accountSuspensionFailedPayload],
     ["cap_hit", capHitPayload],
     ["fleet_util_exceeded", fleetUtilExceededPayload],
     ["fleet_util_recovered", fleetUtilRecoveredPayload],
@@ -289,5 +301,30 @@ describe("discord — truncation", () => {
     });
     expect(noLoneSurrogate).toBe(true);
     expect(Array.from(title).length).toBe(256);
+  });
+});
+
+describe("discord — account_suspension_failed wording", () => {
+  it("description says enforcement FAILED and account remains ACTIVE", async () => {
+    const fetchMock = mockFetch(200);
+    await discord.send(accountSuspensionFailedPayload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.description).toContain("FAILED");
+    expect(embed?.description).toContain("ACTIVE");
+  });
+
+  it("description includes the error text", async () => {
+    const fetchMock = mockFetch(200);
+    await discord.send(accountSuspensionFailedPayload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.description).toContain("suspension rollback: db timeout");
+  });
+
+  it("never reads like account_suspended: title differs, no standalone 'suspended'", async () => {
+    const fetchMock = mockFetch(200);
+    await discord.send(accountSuspensionFailedPayload, BASE_ENV);
+    const embed = parseJson(fetchMock).embeds?.[0];
+    expect(embed?.title).not.toBe("Account Suspended");
+    expect(embed?.description).not.toMatch(/\bsuspended\b/);
   });
 });

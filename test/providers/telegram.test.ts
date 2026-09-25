@@ -53,6 +53,16 @@ const accountSuspendedPayload: WebhookPayload = {
   detected_at: "2026-04-12T14:23:11Z",
 };
 
+const accountSuspensionFailedPayload: WebhookPayload = {
+  event: "account_suspension_failed",
+  account_id: 42,
+  monitor_id: 0,
+  reason: "dns_rebinding",
+  detail: "Confirmed DNS-rebinding detection",
+  error: "suspension rollback: db timeout",
+  detected_at: "2026-04-12T14:23:11Z",
+};
+
 const capHitPayload: WebhookPayload = {
   event: "cap_hit",
   account_id: 42,
@@ -137,6 +147,7 @@ describe("telegram — text non-empty and chat_id correct for all events", () =>
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
+    ["account_suspension_failed", accountSuspensionFailedPayload],
     ["cap_hit", capHitPayload],
     ["fleet_util_exceeded", fleetUtilExceededPayload],
     ["fleet_util_recovered", fleetUtilRecoveredPayload],
@@ -286,5 +297,29 @@ describe("telegram — truncation", () => {
     });
     expect(noLoneSurrogate).toBe(true);
     expect(Array.from(text).length).toBe(4096);
+  });
+});
+
+describe("telegram — account_suspension_failed wording", () => {
+  it("text says enforcement FAILED and account remains ACTIVE", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(accountSuspensionFailedPayload, BASE_ENV);
+    const text = parseJson(fetchMock).text!;
+    expect(text).toContain("FAILED");
+    expect(text).toContain("ACTIVE");
+  });
+
+  it("text includes the error text", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(accountSuspensionFailedPayload, BASE_ENV);
+    expect(parseJson(fetchMock).text).toContain("suspension rollback: db timeout");
+  });
+
+  it("never reads like account_suspended: title differs, no standalone 'suspended'", async () => {
+    const fetchMock = mockFetch(200, '{"ok":true}');
+    await telegram.send(accountSuspensionFailedPayload, BASE_ENV);
+    const text = parseJson(fetchMock).text!;
+    expect(text.startsWith("Account Suspended\n")).toBe(false);
+    expect(text).not.toMatch(/\bsuspended\b/);
   });
 });

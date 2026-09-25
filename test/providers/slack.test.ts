@@ -52,6 +52,16 @@ const accountSuspendedPayload: WebhookPayload = {
   detected_at: "2026-04-12T14:23:11Z",
 };
 
+const accountSuspensionFailedPayload: WebhookPayload = {
+  event: "account_suspension_failed",
+  account_id: 42,
+  monitor_id: 0,
+  reason: "dns_rebinding",
+  detail: "Confirmed DNS-rebinding detection",
+  error: "suspension rollback: db timeout",
+  detected_at: "2026-04-12T14:23:11Z",
+};
+
 const capHitPayload: WebhookPayload = {
   event: "cap_hit",
   account_id: 42,
@@ -126,6 +136,7 @@ describe("slack — color mapping", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, "danger"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "good"],
     ["account_suspended", accountSuspendedPayload, "danger"],
+    ["account_suspension_failed", accountSuspensionFailedPayload, "danger"],
     ["cap_hit", capHitPayload, "warning"],
     ["fleet_util_exceeded", fleetUtilExceededPayload, "warning"],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, "good"],
@@ -144,6 +155,7 @@ describe("slack — title and text non-empty", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload],
     ["kill_switch_flipped active=false", killSwitchInactivePayload],
     ["account_suspended", accountSuspendedPayload],
+    ["account_suspension_failed", accountSuspensionFailedPayload],
     ["cap_hit", capHitPayload],
     ["fleet_util_exceeded", fleetUtilExceededPayload],
     ["fleet_util_recovered", fleetUtilRecoveredPayload],
@@ -297,5 +309,30 @@ describe("slack — truncation", () => {
     });
     expect(noLoneSurrogate).toBe(true);
     expect(Array.from(title).length).toBe(250);
+  });
+});
+
+describe("slack — account_suspension_failed wording", () => {
+  it("text says enforcement FAILED and account remains ACTIVE", async () => {
+    const fetchMock = mockFetch(200);
+    await slack.send(accountSuspensionFailedPayload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.text).toContain("FAILED");
+    expect(att?.text).toContain("ACTIVE");
+  });
+
+  it("text includes the error text", async () => {
+    const fetchMock = mockFetch(200);
+    await slack.send(accountSuspensionFailedPayload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.text).toContain("suspension rollback: db timeout");
+  });
+
+  it("never reads like account_suspended: title differs, no standalone 'suspended'", async () => {
+    const fetchMock = mockFetch(200);
+    await slack.send(accountSuspensionFailedPayload, BASE_ENV);
+    const att = parseJson(fetchMock).attachments?.[0];
+    expect(att?.title).not.toBe("Account Suspended");
+    expect(att?.text).not.toMatch(/\bsuspended\b/);
   });
 });

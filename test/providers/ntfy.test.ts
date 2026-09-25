@@ -52,6 +52,16 @@ const accountSuspendedPayload: WebhookPayload = {
   detected_at: "2026-04-12T14:23:11Z",
 };
 
+const accountSuspensionFailedPayload: WebhookPayload = {
+  event: "account_suspension_failed",
+  account_id: 42,
+  monitor_id: 0,
+  reason: "dns_rebinding",
+  detail: "Confirmed DNS-rebinding detection",
+  error: "suspension rollback: db timeout",
+  detected_at: "2026-04-12T14:23:11Z",
+};
+
 const capHitPayload: WebhookPayload = {
   event: "cap_hit",
   account_id: 42,
@@ -143,6 +153,7 @@ describe("ntfy — priority mapping", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, 5],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 3],
     ["account_suspended", accountSuspendedPayload, 5],
+    ["account_suspension_failed", accountSuspensionFailedPayload, 5],
     ["cap_hit", capHitPayload, 4],
     ["fleet_util_exceeded", fleetUtilExceededPayload, 4],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, 3],
@@ -161,6 +172,7 @@ describe("ntfy — tags", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, "lock"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "unlock"],
     ["account_suspended", accountSuspendedPayload, "no_entry"],
+    ["account_suspension_failed", accountSuspensionFailedPayload, "warning"],
     ["cap_hit", capHitPayload, "chart_with_upwards_trend"],
     ["fleet_util_exceeded", fleetUtilExceededPayload, "warning"],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, "white_check_mark"],
@@ -360,5 +372,29 @@ describe("ntfy — UTF-8 title in JSON body", () => {
     });
     expect(noLoneSurrogate).toBe(true);
     expect(Array.from(title).length).toBe(250);
+  });
+});
+
+describe("ntfy — account_suspension_failed wording", () => {
+  it("message says enforcement FAILED and account remains ACTIVE", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(accountSuspensionFailedPayload, BASE_ENV);
+    const message = parseJson(fetchMock).message;
+    expect(message).toContain("FAILED");
+    expect(message).toContain("ACTIVE");
+  });
+
+  it("message includes the error text", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(accountSuspensionFailedPayload, BASE_ENV);
+    expect(parseJson(fetchMock).message).toContain("suspension rollback: db timeout");
+  });
+
+  it("never reads like account_suspended: title differs, no standalone 'suspended'", async () => {
+    const fetchMock = mockFetch(200);
+    await ntfy.send(accountSuspensionFailedPayload, BASE_ENV);
+    const json = parseJson(fetchMock);
+    expect(json.title).not.toBe("Account Suspended");
+    expect(json.message).not.toMatch(/\bsuspended\b/);
   });
 });

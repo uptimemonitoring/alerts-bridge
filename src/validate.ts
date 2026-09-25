@@ -183,6 +183,34 @@ function validateSecurityPayload(
         },
       };
     }
+    case "account_suspension_failed": {
+      const account_id = requireSafeInt(body, "account_id");
+      if (account_id === null) return { ok: false, status: 400, message: "account_id must be a positive integer" };
+      // monitor_id may be 0 when not applicable
+      const monitor_id = requireSafeInt(body, "monitor_id", true);
+      if (monitor_id === null) return { ok: false, status: 400, message: "monitor_id must be a non-negative integer" };
+      const reason = requireString(body, "reason");
+      if (reason === null) return { ok: false, status: 400, message: "reason must be a string" };
+      const detail = requireString(body, "detail");
+      if (detail === null) return { ok: false, status: 400, message: "detail must be a string" };
+      const error = requireString(body, "error");
+      if (error === null) return { ok: false, status: 400, message: "error must be a string" };
+      if (!validTimestamp(body["detected_at"])) {
+        return { ok: false, status: 400, message: "detected_at must be an RFC3339 timestamp" };
+      }
+      return {
+        ok: true,
+        payload: {
+          event: "account_suspension_failed",
+          account_id,
+          monitor_id,
+          reason,
+          detail,
+          error,
+          detected_at: body["detected_at"] as string,
+        },
+      };
+    }
     case "cap_hit": {
       const account_id = requireSafeInt(body, "account_id");
       if (account_id === null) return { ok: false, status: 400, message: "account_id must be a positive integer" };

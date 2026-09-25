@@ -32,7 +32,7 @@ ntfy delivers push notifications via the ntfy.sh open-source pub/sub service. Pu
 
 | Priority | Events |
 |---|---|
-| 5 (urgent) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| 5 (urgent) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended`, `account_suspension_failed` |
 | 4 (high) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
 | 3 (default) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
@@ -47,7 +47,7 @@ Slack delivers alerts as message attachments with severity colors via an [Incomi
 
 | Color | Events |
 |---|---|
-| `danger` (red) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| `danger` (red) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended`, `account_suspension_failed` |
 | `warning` (yellow) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
 | `good` (green) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
@@ -62,7 +62,7 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 
 | Color | Events |
 |---|---|
-| Red (`#E01E5A`) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended` |
+| Red (`#E01E5A`) | `monitor.down`, `kill_switch_flipped` (active), `account_suspended`, `account_suspension_failed` |
 | Amber (`#F2C744`) | `monitor.flapping`, `cap_hit`, `fleet_util_exceeded` |
 | Green (`#2EB67D`) | `monitor.up`, `kill_switch_flipped` (inactive), `fleet_util_recovered` |
 
