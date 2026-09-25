@@ -192,6 +192,49 @@ describe("validate — security payload validation", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("accepts account_suspension_failed payload", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"Confirmed DNS-rebinding detection","error":"suspension rollback: db timeout","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+    if (r.ok && r.payload.event === "account_suspension_failed") {
+      expect(r.payload.error).toBe("suspension rollback: db timeout");
+    }
+  });
+
+  it("rejects account_suspension_failed missing error with 400", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"Confirmed DNS-rebinding detection","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/error/);
+    }
+  });
+
+  it("rejects account_suspension_failed with non-string error with 400", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"Confirmed DNS-rebinding detection","error":123,"detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(/error/);
+    }
+  });
+
+  it("rejects account_suspension_failed missing reason with 400", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"detail":"Confirmed DNS-rebinding detection","error":"db timeout","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("rejects account_suspension_failed missing detected_at with 400", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"d","error":"db timeout"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
   it("accepts cap_hit payload", () => {
     const body = '{"event":"cap_hit","account_id":42,"monitor_id":1,"monitors_current":100,"detected_at":"2026-01-01T00:00:00Z"}';
     const r = validate(makeReq("POST", body), utf8(body));
@@ -228,6 +271,19 @@ describe("validate — negative monitor_id rejection (codex fix)", () => {
 
   it("accepts account_suspended with monitor_id=0 (allowZero=true)", () => {
     const body = '{"event":"account_suspended","account_id":42,"monitor_id":0,"reason":"fraud","detail":"d","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects account_suspension_failed with monitor_id=-1 with 400", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":-1,"reason":"dns_rebinding","detail":"d","error":"db timeout","detected_at":"2026-01-01T00:00:00Z"}';
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(400);
+  });
+
+  it("accepts account_suspension_failed with monitor_id=0 (allowZero=true)", () => {
+    const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"d","error":"db timeout","detected_at":"2026-01-01T00:00:00Z"}';
     const r = validate(makeReq("POST", body), utf8(body));
     expect(r.ok).toBe(true);
   });

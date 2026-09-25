@@ -16,6 +16,7 @@ function getColor(payload: WebhookPayload): number {
     case "monitor.flapping": return 0xF2C744;
     case "kill_switch_flipped": return payload.active ? 0xE01E5A : 0x2EB67D;
     case "account_suspended": return 0xE01E5A;
+    case "account_suspension_failed": return 0xE01E5A;
     case "cap_hit": return 0xF2C744;
     case "fleet_util_exceeded": return 0xF2C744;
     case "fleet_util_recovered": return 0x2EB67D;
@@ -66,6 +67,13 @@ function format(payload: WebhookPayload): { title: string; description: string }
       return {
         title: "Account Suspended",
         description: `Account #${payload.account_id} suspended${monitorSeg}.\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
+      };
+    }
+    case "account_suspension_failed": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
+      return {
+        title: "Account Suspension Failed",
+        description: `Account #${payload.account_id} suspension FAILED${monitorSeg}. Account remains ACTIVE.\nReason: ${payload.reason} | Detail: ${payload.detail} | Error: ${payload.error} | Detected: ${payload.detected_at}`,
       };
     }
     case "cap_hit": {

@@ -54,6 +54,16 @@ const accountSuspendedPayload: WebhookPayload = {
   detected_at: "2026-04-12T14:23:11Z",
 };
 
+const accountSuspensionFailedPayload: WebhookPayload = {
+  event: "account_suspension_failed",
+  account_id: 42,
+  monitor_id: 0,
+  reason: "dns_rebinding",
+  detail: "Confirmed DNS-rebinding detection",
+  error: "suspension rollback: db timeout",
+  detected_at: "2026-04-12T14:23:11Z",
+};
+
 const capHitPayload: WebhookPayload = {
   event: "cap_hit",
   account_id: 42,
@@ -135,6 +145,7 @@ describe("pushover — priority mapping", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, 2],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, 0],
     ["account_suspended", accountSuspendedPayload, 2],
+    ["account_suspension_failed", accountSuspensionFailedPayload, 2],
     ["cap_hit", capHitPayload, 1],
     ["fleet_util_exceeded", fleetUtilExceededPayload, 1],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, 0],
@@ -282,6 +293,7 @@ describe("pushover — title formats", () => {
     ["kill_switch_flipped active=true", killSwitchActivePayload, "Kill Switch Activated"],
     ["kill_switch_flipped active=false", killSwitchInactivePayload, "Kill Switch Deactivated"],
     ["account_suspended", accountSuspendedPayload, "Account Suspended"],
+    ["account_suspension_failed", accountSuspensionFailedPayload, "Account Suspension Failed"],
     ["cap_hit", capHitPayload, "Monitor Cap Hit"],
     ["fleet_util_exceeded", fleetUtilExceededPayload, "Fleet Utilization Exceeded"],
     ["fleet_util_recovered", fleetUtilRecoveredPayload, "Fleet Utilization Recovered"],
@@ -410,11 +422,52 @@ describe("pushover — monitor_id sentinel (0)", () => {
     expect(body["message"]).not.toContain("#0");
   });
 
+  it("account_suspension_failed omits #0 in message", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspensionFailedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).not.toContain("#0");
+  });
+
   it("cap_hit omits #0 in message", async () => {
     const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
     await pushover.send(capHitPayload, BASE_ENV);
     const body = parseBody(fetchMock);
     expect(body["message"]).not.toContain("#0");
+  });
+});
+
+describe("pushover — account_suspension_failed wording", () => {
+  it("message says enforcement FAILED and account remains ACTIVE", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspensionFailedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("FAILED");
+    expect(body["message"]).toContain("ACTIVE");
+  });
+
+  it("message includes the error text", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspensionFailedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["message"]).toContain("suspension rollback: db timeout");
+  });
+
+  it("never reads like account_suspended: does not contain the standalone word 'suspended'", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspensionFailedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["title"]).not.toBe("Account Suspended");
+    expect(body["message"]).not.toMatch(/\bsuspended\b/);
+  });
+
+  it("uses priority 2, same as account_suspended and the kill switch", async () => {
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(accountSuspensionFailedPayload, BASE_ENV);
+    const body = parseBody(fetchMock);
+    expect(body["priority"]).toBe("2");
+    expect(body["retry"]).toBe("30");
+    expect(body["expire"]).toBe("1800");
   });
 });
 

@@ -3,6 +3,7 @@ export type MonitorEvent = "monitor.down" | "monitor.up" | "monitor.flapping";
 export type SecurityEvent =
   | "kill_switch_flipped"
   | "account_suspended"
+  | "account_suspension_failed"
   | "cap_hit"
   | "fleet_util_exceeded"
   | "fleet_util_recovered";
@@ -38,6 +39,20 @@ interface AccountSuspendedPayload {
   detected_at: string;
 }
 
+// Pinned to alerter.go (account_suspension_failed sender in um-api's
+// internal/security/alerter.go). Same fields as AccountSuspendedPayload plus
+// error: a confirmed DNS-rebinding detection tried to suspend the account and
+// the suspension rolled back, so the account stays active.
+interface AccountSuspensionFailedPayload {
+  event: "account_suspension_failed";
+  account_id: number;
+  monitor_id: number;
+  reason: string;
+  detail: string;
+  error: string;
+  detected_at: string;
+}
+
 // Pinned to alerter.go:43-48, 221-227
 interface CapHitPayload {
   event: "cap_hit";
@@ -68,6 +83,7 @@ interface FleetUtilRecoveredPayload {
 export type SecurityAlertPayload =
   | KillSwitchFlippedPayload
   | AccountSuspendedPayload
+  | AccountSuspensionFailedPayload
   | CapHitPayload
   | FleetUtilExceededPayload
   | FleetUtilRecoveredPayload;
@@ -82,6 +98,7 @@ export function isSecurityEvent(s: string): s is SecurityEvent {
   return (
     s === "kill_switch_flipped" ||
     s === "account_suspended" ||
+    s === "account_suspension_failed" ||
     s === "cap_hit" ||
     s === "fleet_util_exceeded" ||
     s === "fleet_util_recovered"

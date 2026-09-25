@@ -21,6 +21,7 @@ function getPriority(payload: WebhookPayload): number {
     case "monitor.flapping": return 4;
     case "kill_switch_flipped": return payload.active ? 5 : 3;
     case "account_suspended": return 5;
+    case "account_suspension_failed": return 5;
     case "cap_hit": return 4;
     case "fleet_util_exceeded": return 4;
     case "fleet_util_recovered": return 3;
@@ -38,6 +39,7 @@ function getTags(payload: WebhookPayload): string[] {
     case "monitor.flapping": return ["warning"];
     case "kill_switch_flipped": return payload.active ? ["lock"] : ["unlock"];
     case "account_suspended": return ["no_entry"];
+    case "account_suspension_failed": return ["warning"];
     case "cap_hit": return ["chart_with_upwards_trend"];
     case "fleet_util_exceeded": return ["warning"];
     case "fleet_util_recovered": return ["white_check_mark"];
@@ -88,6 +90,13 @@ function format(payload: WebhookPayload): { title: string; message: string } {
       return {
         title: "Account Suspended",
         message: `Account #${payload.account_id} suspended${monitorSeg}.\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
+      };
+    }
+    case "account_suspension_failed": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
+      return {
+        title: "Account Suspension Failed",
+        message: `Account #${payload.account_id} suspension FAILED${monitorSeg}. Account remains ACTIVE.\nReason: ${payload.reason} | Detail: ${payload.detail} | Error: ${payload.error} | Detected: ${payload.detected_at}`,
       };
     }
     case "cap_hit": {

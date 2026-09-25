@@ -50,6 +50,13 @@ function format(payload: WebhookPayload): { title: string; body: string } {
         body: `Account #${payload.account_id} suspended${monitorSeg}.\nReason: ${payload.reason} | Detail: ${payload.detail} | Detected: ${payload.detected_at}`,
       };
     }
+    case "account_suspension_failed": {
+      const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
+      return {
+        title: "Account Suspension Failed",
+        body: `Account #${payload.account_id} suspension FAILED${monitorSeg}. Account remains ACTIVE.\nReason: ${payload.reason} | Detail: ${payload.detail} | Error: ${payload.error} | Detected: ${payload.detected_at}`,
+      };
+    }
     case "cap_hit": {
       const monitorSeg = payload.monitor_id !== 0 ? ` (monitor #${payload.monitor_id})` : "";
       return {
