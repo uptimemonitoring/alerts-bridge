@@ -195,10 +195,18 @@ describe("validate — security payload validation", () => {
   it("accepts account_suspension_failed payload", () => {
     const body = '{"event":"account_suspension_failed","account_id":42,"monitor_id":0,"reason":"dns_rebinding","detail":"Confirmed DNS-rebinding detection","error":"suspension rollback: db timeout","detected_at":"2026-01-01T00:00:00Z"}';
     const r = validate(makeReq("POST", body), utf8(body));
-    expect(r.ok).toBe(true);
-    if (r.ok && r.payload.event === "account_suspension_failed") {
-      expect(r.payload.error).toBe("suspension rollback: db timeout");
-    }
+    expect(r).toEqual({
+      ok: true,
+      payload: {
+        event: "account_suspension_failed",
+        account_id: 42,
+        monitor_id: 0,
+        reason: "dns_rebinding",
+        detail: "Confirmed DNS-rebinding detection",
+        error: "suspension rollback: db timeout",
+        detected_at: "2026-01-01T00:00:00Z",
+      },
+    });
   });
 
   it("rejects account_suspension_failed missing error with 400", () => {
