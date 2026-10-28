@@ -1,4 +1,5 @@
 import type { Env, Provider, WebhookPayload } from "../types.js";
+import { monitorFallbackName } from "../types.js";
 
 const PUSHOVER_API = "https://api.pushover.net/1/messages.json";
 const TITLE_MAX = 250;
@@ -48,7 +49,7 @@ function getPriority(payload: WebhookPayload, env: Env): number {
 function format(payload: WebhookPayload): { title: string; message: string } {
   switch (payload.event) {
     case "monitor.down": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let message = `${name} is DOWN`;
       if (payload.reason) message += ` — ${payload.reason}`;
       if (payload.monitor_url) message += `\n${payload.monitor_url}`;
@@ -56,7 +57,7 @@ function format(payload: WebhookPayload): { title: string; message: string } {
       return { title: `[DOWN] ${name}`, message };
     }
     case "monitor.up": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let message = `${name} is UP`;
       if (payload.reason) message += ` — ${payload.reason}`;
       if (payload.monitor_url) message += `\n${payload.monitor_url}`;
@@ -64,7 +65,7 @@ function format(payload: WebhookPayload): { title: string; message: string } {
       return { title: `[UP] ${name}`, message };
     }
     case "monitor.flapping": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let message = `${name} is FLAPPING`;
       if (payload.reason) message += ` — ${payload.reason}`;
       if (payload.monitor_url) message += `\n${payload.monitor_url}`;

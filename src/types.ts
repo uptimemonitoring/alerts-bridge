@@ -8,17 +8,29 @@ export type SecurityEvent =
   | "fleet_util_exceeded"
   | "fleet_util_recovered";
 
-export interface MonitorWebhookPayload {
+interface MonitorWebhookPayloadBase {
   event: MonitorEvent;
-  monitor_id: number;
   occurred_at: string;
   monitor_name?: string;
   monitor_url?: string;
   reason?: string;
   account_id?: number;
+  // Per-account handle, for example "k7q2m".
+  account_handle?: string;
+  // Per-account incident reference, for example "k7q2m-42".
+  incident_ref?: string;
   delivery_id?: number;
   attempt?: number;
 }
+
+// A monitor event identifies its monitor by the numeric monitor_id, the
+// per-account monitor_ref (for example "k7q2m-3"), or both. validate.ts
+// rejects an event that carries neither.
+export type MonitorIdentity =
+  | { monitor_id: number; monitor_ref?: string }
+  | { monitor_id?: number; monitor_ref: string };
+
+export type MonitorWebhookPayload = MonitorWebhookPayloadBase & MonitorIdentity;
 
 // Pinned to alerter.go:32-37, 176-184
 interface KillSwitchFlippedPayload {
@@ -92,6 +104,17 @@ export type WebhookPayload = MonitorWebhookPayload | SecurityAlertPayload;
 
 export function isMonitorEvent(s: string): s is MonitorEvent {
   return s === "monitor.down" || s === "monitor.up" || s === "monitor.flapping";
+}
+
+/**
+ * Name to show for a monitor event that has no monitor_name. Prefers the
+ * per-account reference ("Monitor k7q2m-3") over the numeric ID
+ * ("Monitor #1287").
+ */
+export function monitorFallbackName(payload: MonitorWebhookPayload): string {
+  return payload.monitor_ref !== undefined
+    ? `Monitor ${payload.monitor_ref}`
+    : `Monitor #${payload.monitor_id}`;
 }
 
 export function isSecurityEvent(s: string): s is SecurityEvent {

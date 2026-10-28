@@ -76,6 +76,41 @@ Discord delivers alerts as rich embeds with a color-coded left border via an [In
 
 Telegram delivers alerts as plain-text messages via the [Bot API](https://core.telegram.org/bots/api#sendmessage) `sendMessage` endpoint. Messages are sent without `parse_mode`, so monitor names containing Markdown metacharacters (`_`, `*`, `[`, `]`, `` ` ``) are delivered verbatim and cannot cause API errors.
 
+## Monitor event payload
+
+The UptimeMonitoring API sends `monitor.down`, `monitor.up`, and `monitor.flapping` events as a JSON body. The bridge accepts these fields:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `event` | string | Yes | `monitor.down`, `monitor.up`, or `monitor.flapping`. |
+| `occurred_at` | string | Yes | RFC 3339 timestamp, for example `2026-04-12T14:23:11Z`. |
+| `monitor_ref` | string | Yes, unless `monitor_id` is present | Per-account monitor reference, for example `k7q2m-3`. |
+| `monitor_id` | integer | Yes, unless `monitor_ref` is present | Numeric monitor ID, a positive integer. `monitor_ref` replaces it. |
+| `monitor_name` | string | No | Display name of the monitor. |
+| `monitor_url` | string | No | URL of the monitored target. |
+| `reason` | string | No | Why the state changed, for example `http_5xx`. |
+| `account_handle` | string | No | Per-account handle, for example `k7q2m`. |
+| `incident_ref` | string | No | Per-account incident reference, for example `k7q2m-42`. |
+| `account_id` | integer | No | Numeric account ID, zero or greater. |
+| `delivery_id` | integer | No | Delivery ID, zero or greater. |
+| `attempt` | integer | No | Delivery attempt number, zero or greater. |
+
+Identifier formats:
+
+- An account handle is five or six characters from the lowercase Crockford base32 alphabet: the digits `0` to `9` and the letters `a` to `z` without `i`, `l`, `o`, or `u`. The handle matches `^[0-9a-hjkmnp-tv-z]{5,6}$`.
+- A reference (`monitor_ref` or `incident_ref`) is an account handle, a hyphen, and a positive integer with no leading zero. The reference matches `^[0-9a-hjkmnp-tv-z]{5,6}-[1-9][0-9]*$`.
+
+Validation rules:
+
+- A monitor event must carry `monitor_ref`, `monitor_id`, or both. An event with neither returns `400` with the message `monitor_id or monitor_ref is required`.
+- A field that is present must be well formed, even when the other identifier is valid. A malformed value returns `400` with a message that starts with the field name, for example `monitor_ref must be ...`.
+- A `null` value counts as an absent field.
+- The bridge ignores fields that the table doesn't list.
+
+When `monitor_name` is absent, alerts name the monitor from its reference, for example `Monitor k7q2m-3`. An event without `monitor_ref` falls back to the numeric ID, for example `Monitor #1287`. The bridge validates `account_handle` and `incident_ref` but doesn't show them in alerts.
+
+Security events (`kill_switch_flipped`, `account_suspended`, `account_suspension_failed`, `cap_hit`, `fleet_util_exceeded`, and `fleet_util_recovered`) keep their own numeric fields, and these rules don't apply to them.
+
 ## Deploy to Cloudflare Workers
 
 ```bash

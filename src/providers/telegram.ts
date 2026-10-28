@@ -1,4 +1,5 @@
 import type { Env, Provider, WebhookPayload } from "../types.js";
+import { monitorFallbackName } from "../types.js";
 
 const TEXT_MAX = 4096;
 
@@ -11,7 +12,7 @@ function truncate(s: string, max: number): string {
 function format(payload: WebhookPayload): { title: string; body: string } {
   switch (payload.event) {
     case "monitor.down": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let body = `${name} is DOWN`;
       if (payload.reason) body += ` — ${payload.reason}`;
       if (payload.monitor_url) body += `\n${payload.monitor_url}`;
@@ -19,7 +20,7 @@ function format(payload: WebhookPayload): { title: string; body: string } {
       return { title: `[DOWN] ${name}`, body };
     }
     case "monitor.up": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let body = `${name} is UP`;
       if (payload.reason) body += ` — ${payload.reason}`;
       if (payload.monitor_url) body += `\n${payload.monitor_url}`;
@@ -27,7 +28,7 @@ function format(payload: WebhookPayload): { title: string; body: string } {
       return { title: `[UP] ${name}`, body };
     }
     case "monitor.flapping": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let body = `${name} is FLAPPING`;
       if (payload.reason) body += ` — ${payload.reason}`;
       if (payload.monitor_url) body += `\n${payload.monitor_url}`;

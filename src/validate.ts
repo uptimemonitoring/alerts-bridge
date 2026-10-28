@@ -1,4 +1,4 @@
-import type { WebhookPayload, MonitorEvent } from "./types.js";
+import type { WebhookPayload, MonitorEvent, MonitorIdentity } from "./types.js";
 import { isMonitorEvent, isSecurityEvent } from "./types.js";
 
 export type ValidationResult =
@@ -75,13 +75,51 @@ function requireBoolean(obj: Record<string, unknown>, key: string): boolean | nu
   return typeof v === "boolean" ? v : null;
 }
 
+// An account handle is five or six lowercase Crockford base32 characters
+// (digits and letters, without i, l, o, or u). A reference is a handle, a
+// hyphen, and a positive integer with no leading zero: "k7q2m-3".
+const HANDLE_RE = /^[0-9a-hjkmnp-tv-z]{5,6}$/;
+const REF_RE = /^[0-9a-hjkmnp-tv-z]{5,6}-[1-9][0-9]*$/;
+const HANDLE_FORMAT = "five or six lowercase Crockford base32 characters, for example k7q2m";
+const REF_FORMAT = "an account handle, a hyphen, and a positive integer, for example k7q2m-3";
+
+// Returns undefined when the field is absent or null, null when it is present
+// but not a string matching re, and the string otherwise.
+function optPattern(obj: Record<string, unknown>, key: string, re: RegExp): string | undefined | null {
+  const v = obj[key];
+  if (v === undefined || v === null) return undefined;
+  return typeof v === "string" && re.test(v) ? v : null;
+}
+
 function validateMonitorPayload(
   event: MonitorEvent,
   body: Record<string, unknown>,
 ): ValidationResult {
-  const monitor_id = requireSafeInt(body, "monitor_id");
-  if (monitor_id === null) {
-    return { ok: false, status: 400, message: "monitor_id must be a positive integer" };
+  // monitor_id and monitor_ref are each optional, but the event must carry at
+  // least one. A field that is present must be well formed, even when the
+  // other identifier is valid. null counts as absent, as for every optional.
+  const monitorIdRaw = body["monitor_id"];
+  let monitor_id: number | undefined;
+  if (monitorIdRaw !== undefined && monitorIdRaw !== null) {
+    const n = requireSafeInt(body, "monitor_id");
+    if (n === null) {
+      return { ok: false, status: 400, message: "monitor_id must be a positive integer" };
+    }
+    monitor_id = n;
+  }
+
+  const monitor_ref = optPattern(body, "monitor_ref", REF_RE);
+  if (monitor_ref === null) {
+    return { ok: false, status: 400, message: `monitor_ref must be ${REF_FORMAT}` };
+  }
+
+  let identity: MonitorIdentity;
+  if (monitor_ref !== undefined) {
+    identity = monitor_id !== undefined ? { monitor_id, monitor_ref } : { monitor_ref };
+  } else if (monitor_id !== undefined) {
+    identity = { monitor_id };
+  } else {
+    return { ok: false, status: 400, message: "monitor_id or monitor_ref is required" };
   }
 
   if (!validTimestamp(body["occurred_at"])) {
@@ -110,6 +148,10 @@ function validateMonitorPayload(
   if (reason === null) return { ok: false, status: 400, message: "reason must be a string if present" };
   const account_id = optInt("account_id");
   if (account_id === null) return { ok: false, status: 400, message: "account_id must be a non-negative integer if present" };
+  const account_handle = optPattern(body, "account_handle", HANDLE_RE);
+  if (account_handle === null) return { ok: false, status: 400, message: `account_handle must be ${HANDLE_FORMAT} if present` };
+  const incident_ref = optPattern(body, "incident_ref", REF_RE);
+  if (incident_ref === null) return { ok: false, status: 400, message: `incident_ref must be ${REF_FORMAT} if present` };
   const delivery_id = optInt("delivery_id");
   if (delivery_id === null) return { ok: false, status: 400, message: "delivery_id must be a non-negative integer if present" };
   const attempt = optInt("attempt");
@@ -119,12 +161,14 @@ function validateMonitorPayload(
     ok: true,
     payload: {
       event,
-      monitor_id,
+      ...identity,
       occurred_at: body["occurred_at"] as string,
       ...(monitor_name !== undefined ? { monitor_name } : {}),
       ...(monitor_url !== undefined ? { monitor_url } : {}),
       ...(reason !== undefined ? { reason } : {}),
       ...(account_id !== undefined ? { account_id } : {}),
+      ...(account_handle !== undefined ? { account_handle } : {}),
+      ...(incident_ref !== undefined ? { incident_ref } : {}),
       ...(delivery_id !== undefined ? { delivery_id } : {}),
       ...(attempt !== undefined ? { attempt } : {}),
     },

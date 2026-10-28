@@ -1,4 +1,5 @@
 import type { Env, Provider, WebhookPayload } from "../types.js";
+import { monitorFallbackName } from "../types.js";
 
 const TITLE_MAX = 250;
 const TEXT_MAX = 3000;
@@ -30,7 +31,7 @@ function getColor(payload: WebhookPayload): string {
 function format(payload: WebhookPayload): { title: string; text: string } {
   switch (payload.event) {
     case "monitor.down": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let text = `${name} is DOWN`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
@@ -38,7 +39,7 @@ function format(payload: WebhookPayload): { title: string; text: string } {
       return { title: `[DOWN] ${name}`, text };
     }
     case "monitor.up": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let text = `${name} is UP`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
@@ -46,7 +47,7 @@ function format(payload: WebhookPayload): { title: string; text: string } {
       return { title: `[UP] ${name}`, text };
     }
     case "monitor.flapping": {
-      const name = payload.monitor_name ?? `Monitor #${payload.monitor_id}`;
+      const name = payload.monitor_name ?? monitorFallbackName(payload);
       let text = `${name} is FLAPPING`;
       if (payload.reason) text += ` — ${payload.reason}`;
       if (payload.monitor_url) text += `\n${payload.monitor_url}`;
