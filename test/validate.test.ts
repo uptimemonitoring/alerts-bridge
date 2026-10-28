@@ -396,3 +396,164 @@ describe("validate — null optionals degrade (not 400)", () => {
     }
   });
 });
+
+describe("validate — monitor references", () => {
+  const OCCURRED = '"occurred_at":"2026-04-12T14:23:11Z"';
+
+  function monitorBody(fields: Record<string, unknown>): string {
+    return JSON.stringify({ event: "monitor.down", occurred_at: "2026-04-12T14:23:11Z", ...fields });
+  }
+
+  function expect400(body: string, message: RegExp): void {
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(400);
+      expect(r.message).toMatch(message);
+    }
+  }
+
+  it("accepts an event with only monitor_ref and carries it through", () => {
+    const body = `{"event":"monitor.down","monitor_ref":"k7q2m-3",${OCCURRED}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r).toEqual({
+      ok: true,
+      payload: { event: "monitor.down", monitor_ref: "k7q2m-3", occurred_at: "2026-04-12T14:23:11Z" },
+    });
+  });
+
+  it("returns an id-only event with the same shape as before, and no reference keys", () => {
+    const r = validate(makeReq("POST", MONITOR_DOWN), utf8(MONITOR_DOWN));
+    expect(r).toEqual({
+      ok: true,
+      payload: {
+        event: "monitor.down",
+        monitor_id: 1287,
+        occurred_at: "2026-04-12T14:23:11Z",
+        reason: "http_5xx",
+        monitor_name: "myapp-healthz",
+      },
+    });
+  });
+
+  it("accepts an event with both monitor_id and monitor_ref and keeps both", () => {
+    const body = `{"event":"monitor.up","monitor_id":1287,"monitor_ref":"k7q2m-3",${OCCURRED}}`;
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r).toEqual({
+      ok: true,
+      payload: { event: "monitor.up", monitor_id: 1287, monitor_ref: "k7q2m-3", occurred_at: "2026-04-12T14:23:11Z" },
+    });
+  });
+
+  it("accepts and carries through account_handle and incident_ref", () => {
+    const body = monitorBody({ monitor_ref: "k7q2mz-1287", account_handle: "k7q2mz", incident_ref: "k7q2mz-42" });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r).toEqual({
+      ok: true,
+      payload: {
+        event: "monitor.down",
+        monitor_ref: "k7q2mz-1287",
+        account_handle: "k7q2mz",
+        incident_ref: "k7q2mz-42",
+        occurred_at: "2026-04-12T14:23:11Z",
+      },
+    });
+  });
+
+  it.each(["k7q2m-1", "k7q2m-10", "00000-9", "zzzzzz-123456789"])("accepts monitor_ref %s", (ref) => {
+    const body = monitorBody({ monitor_ref: ref });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects an event with neither monitor_id nor monitor_ref, naming both", () => {
+    expect400(`{"event":"monitor.down",${OCCURRED}}`, /^monitor_id or monitor_ref is required$/);
+  });
+
+  it("treats null monitor_id and null monitor_ref as absent: neither present is a 400", () => {
+    expect400(monitorBody({ monitor_id: null, monitor_ref: null }), /^monitor_id or monitor_ref is required$/);
+  });
+
+  it("accepts null monitor_id when monitor_ref is valid", () => {
+    const body = monitorBody({ monitor_id: null, monitor_ref: "k7q2m-3" });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("monitor_id" in r.payload).toBe(false);
+  });
+
+  it("accepts null monitor_ref when monitor_id is valid and drops it", () => {
+    const body = monitorBody({ monitor_id: 1287, monitor_ref: null });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("monitor_ref" in r.payload).toBe(false);
+  });
+
+  it("rejects a malformed monitor_id even when monitor_ref is valid", () => {
+    expect400(monitorBody({ monitor_id: 0, monitor_ref: "k7q2m-3" }), /^monitor_id /);
+  });
+
+  // Shared bad-reference table: uppercase, each excluded letter (i, l, o, u),
+  // a zero or leading-zero number, 4- and 7-character handles, and shape errors.
+  const BAD_REFS: Array<[string, unknown]> = [
+    ["uppercase", "K7Q2M-3"],
+    ["excluded letter i", "k7q2i-3"],
+    ["excluded letter l", "k7q2l-3"],
+    ["excluded letter o", "k7q2o-3"],
+    ["excluded letter u", "k7q2u-3"],
+    ["zero number", "k7q2m-0"],
+    ["leading-zero number", "k7q2m-03"],
+    ["4-character handle", "k7q2-3"],
+    ["7-character handle", "k7q2mzz-3"],
+    ["no hyphen", "k7q2m3"],
+    ["no number", "k7q2m-"],
+    ["negative number", "k7q2m--3"],
+    ["trailing newline", "k7q2m-3\n"],
+    ["trailing space", "k7q2m-3 "],
+    ["empty string", ""],
+    ["a number", 3],
+  ];
+
+  it.each(BAD_REFS)("rejects monitor_ref with %s, naming monitor_ref", (_label, ref) => {
+    expect400(monitorBody({ monitor_ref: ref }), /^monitor_ref /);
+  });
+
+  it.each(BAD_REFS)("rejects monitor_ref with %s even when monitor_id is valid", (_label, ref) => {
+    expect400(monitorBody({ monitor_id: 1287, monitor_ref: ref }), /^monitor_ref /);
+  });
+
+  it.each(BAD_REFS)("rejects incident_ref with %s, naming incident_ref", (_label, ref) => {
+    expect400(monitorBody({ monitor_ref: "k7q2m-3", incident_ref: ref }), /^incident_ref /);
+  });
+
+  it.each([
+    ["uppercase", "K7Q2M"],
+    ["excluded letter i", "k7q2i"],
+    ["excluded letter l", "k7q2l"],
+    ["excluded letter o", "k7q2o"],
+    ["excluded letter u", "k7q2u"],
+    ["4 characters", "k7q2"],
+    ["7 characters", "k7q2mzz"],
+    ["a reference, not a handle", "k7q2m-3"],
+    ["trailing newline", "k7q2m\n"],
+    ["empty string", ""],
+    ["a number", 12345],
+  ] as Array<[string, unknown]>)("rejects account_handle with %s, naming account_handle", (_label, handle) => {
+    expect400(monitorBody({ monitor_ref: "k7q2m-3", account_handle: handle }), /^account_handle /);
+  });
+
+  it.each(["k7q2m", "k7q2mz"])("accepts account_handle %s", (handle) => {
+    const body = monitorBody({ monitor_id: 1287, account_handle: handle });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+  });
+
+  it("treats null account_handle and incident_ref as absent", () => {
+    const body = monitorBody({ monitor_ref: "k7q2m-3", account_handle: null, incident_ref: null });
+    const r = validate(makeReq("POST", body), utf8(body));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("account_handle" in r.payload).toBe(false);
+      expect("incident_ref" in r.payload).toBe(false);
+    }
+  });
+});

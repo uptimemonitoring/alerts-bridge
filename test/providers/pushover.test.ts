@@ -479,3 +479,46 @@ describe("pushover — occurred_at in monitor message", () => {
     expect(parseBody(fetchMock)["message"]).toContain("2026-04-12T14:23:11Z");
   });
 });
+
+describe("pushover — monitor_ref fallback name", () => {
+  it.each([
+    ["monitor.down", "DOWN"],
+    ["monitor.up", "UP"],
+    ["monitor.flapping", "FLAPPING"],
+  ] as const)("%s with only monitor_ref and no name renders 'Monitor k7q2m-3'", async (event, label) => {
+    const payload: WebhookPayload = { event, monitor_ref: "k7q2m-3", occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    const result = await pushover.send(payload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+      expect(parseBody(fetchMock)["title"]).toBe(`[${label}] Monitor k7q2m-3`);
+    expect(parseBody(fetchMock)["message"]).toContain(`Monitor k7q2m-3 is ${label}`);
+    expect(parseBody(fetchMock)["message"]).not.toContain("#");
+  });
+
+  it("prefers monitor_ref over monitor_id when both are present", async () => {
+    const payload: WebhookPayload = {
+      event: "monitor.down",
+      monitor_id: 1287,
+      monitor_ref: "k7q2m-3",
+      occurred_at: "2026-04-12T14:23:11Z",
+    };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    expect(parseBody(fetchMock)["title"]).toBe("[DOWN] Monitor k7q2m-3");
+    expect(parseBody(fetchMock)["message"]).toContain("Monitor k7q2m-3 is DOWN");
+    expect(parseBody(fetchMock)["message"]).not.toContain("1287");
+  });
+
+  it("prefers monitor_name over monitor_ref", async () => {
+    const payload: WebhookPayload = {
+      event: "monitor.down",
+      monitor_ref: "k7q2m-3",
+      monitor_name: "myapp-healthz",
+      occurred_at: "2026-04-12T14:23:11Z",
+    };
+    const fetchMock = mockFetch(200, JSON.stringify({ status: 1 }));
+    await pushover.send(payload, BASE_ENV);
+    expect(parseBody(fetchMock)["message"]).toContain("myapp-healthz is DOWN");
+    expect(parseBody(fetchMock)["message"]).not.toContain("k7q2m-3");
+  });
+});

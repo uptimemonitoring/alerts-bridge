@@ -52,6 +52,25 @@ describe("handle — monitor payload", () => {
     expect(body["event"]).toBe("monitor.down");
   });
 
+  it("returns 200 for a valid signed monitor-down that carries only monitor_ref", async () => {
+    const { raw, buf } = loadFixture("monitor-down-ref.json");
+    const sig = sign(MONITOR_SECRET, buf);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const res = await handle(req, baseEnv, raw);
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body["event"]).toBe("monitor.down");
+  });
+
+  it("returns 400 naming both fields for a signed monitor event with neither monitor_id nor monitor_ref", async () => {
+    const raw = new TextEncoder().encode('{"event":"monitor.down","occurred_at":"2026-04-12T14:23:11Z"}');
+    const sig = sign(MONITOR_SECRET, raw);
+    const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": sig });
+    const res = await handle(req, baseEnv, raw);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("monitor_id or monitor_ref is required");
+  });
+
   it("returns 401 when signature mismatched", async () => {
     const { raw } = loadFixture("monitor-down.json");
     const req = makeRequest("POST", raw, { "x-uptimemonitoring-signature": "a".repeat(64) });

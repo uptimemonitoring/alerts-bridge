@@ -336,3 +336,46 @@ describe("slack — account_suspension_failed wording", () => {
     expect(att?.text).not.toMatch(/\bsuspended\b/);
   });
 });
+
+describe("slack — monitor_ref fallback name", () => {
+  it.each([
+    ["monitor.down", "DOWN"],
+    ["monitor.up", "UP"],
+    ["monitor.flapping", "FLAPPING"],
+  ] as const)("%s with only monitor_ref and no name renders 'Monitor k7q2m-3'", async (event, label) => {
+    const payload: WebhookPayload = { event, monitor_ref: "k7q2m-3", occurred_at: "2026-04-12T14:23:11Z" };
+    const fetchMock = mockFetch(200);
+    const result = await slack.send(payload, BASE_ENV);
+    expect(result).toEqual({ ok: true });
+      expect(parseJson(fetchMock).attachments?.[0]?.title).toBe(`[${label}] Monitor k7q2m-3`);
+    expect(parseJson(fetchMock).attachments?.[0]?.text).toContain(`Monitor k7q2m-3 is ${label}`);
+    expect(parseJson(fetchMock).attachments?.[0]?.text).not.toContain("#");
+  });
+
+  it("prefers monitor_ref over monitor_id when both are present", async () => {
+    const payload: WebhookPayload = {
+      event: "monitor.down",
+      monitor_id: 1287,
+      monitor_ref: "k7q2m-3",
+      occurred_at: "2026-04-12T14:23:11Z",
+    };
+    const fetchMock = mockFetch(200);
+    await slack.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).attachments?.[0]?.title).toBe("[DOWN] Monitor k7q2m-3");
+    expect(parseJson(fetchMock).attachments?.[0]?.text).toContain("Monitor k7q2m-3 is DOWN");
+    expect(parseJson(fetchMock).attachments?.[0]?.text).not.toContain("1287");
+  });
+
+  it("prefers monitor_name over monitor_ref", async () => {
+    const payload: WebhookPayload = {
+      event: "monitor.down",
+      monitor_ref: "k7q2m-3",
+      monitor_name: "myapp-healthz",
+      occurred_at: "2026-04-12T14:23:11Z",
+    };
+    const fetchMock = mockFetch(200);
+    await slack.send(payload, BASE_ENV);
+    expect(parseJson(fetchMock).attachments?.[0]?.text).toContain("myapp-healthz is DOWN");
+    expect(parseJson(fetchMock).attachments?.[0]?.text).not.toContain("k7q2m-3");
+  });
+});
